@@ -1,5 +1,4 @@
 from pathlib import Path
-from datetime import datetime
 import os
 import time
 
@@ -25,8 +24,7 @@ IEDRIVER_PATH = (
 )
 
 EDGE_PATH = (
-    r"C:\Program Files (x86)"
-    r"\Microsoft\Edge\Application\msedge.exe"
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
 )
 
 LOG_PATH = BASE_DIR / "iedriver.log"
@@ -36,25 +34,15 @@ TRILAY_URL = (
 )
 
 
-# Carpeta donde después guardaremos
-# los PDF descargados.
-DOWNLOADS_DIR = BASE_DIR / "downloads"
-
-DOWNLOADS_DIR.mkdir(
-    exist_ok=True
-)
-
-
 # =========================================================
-# FECHA Y CLIENTE
+# FILTRO
 # =========================================================
 
-# La fecha se calcula automáticamente
-# cada vez que ejecutás el programa.
+# Por ahora estamos probando con esta fecha.
+# Más adelante podemos hacer que use automáticamente
+# la fecha actual o que la pases por consola.
 
-FECHA_HOY = datetime.now().strftime(
-    "%d/%m/%Y"
-)
+FECHA_BUSQUEDA = "10/09/2026"
 
 CLIENTE = "atomo"
 
@@ -79,33 +67,14 @@ PASSWORD = os.getenv(
 if not USUARIO or not PASSWORD:
 
     raise ValueError(
-        "No se encontraron las "
-        "credenciales en el archivo .env"
+        "No se encontraron las credenciales "
+        "en el archivo .env"
     )
 
 
 # =========================================================
 # CONFIGURAR EDGE + IE MODE
 # =========================================================
-
-print()
-print("========================================")
-print(" AUTOMATIZACIÓN TRILAY - FACTURAS ATOMO ")
-print("========================================")
-print()
-
-print(
-    "Fecha:",
-    FECHA_HOY
-)
-
-print(
-    "Cliente:",
-    CLIENTE.upper()
-)
-
-print()
-
 
 options = webdriver.IeOptions()
 
@@ -117,9 +86,9 @@ options.edge_executable_path = (
 
 options.page_load_strategy = "none"
 
-
-# Esto evita el problema de Protected Mode
-# que tuvimos al comienzo.
+# Importante:
+# iniciar directamente en Trilay evita el problema
+# que tuvimos con Protected Mode.
 options.initial_browser_url = (
     TRILAY_URL
 )
@@ -144,12 +113,30 @@ driver = webdriver.Ie(
 
 try:
 
-    # =====================================================
-    # 1. LOGIN AUTOMÁTICO
-    # =====================================================
+    print()
+    print("==========================================")
+    print(" TRILAY - FACTURAS ATOMO")
+    print("==========================================")
+    print()
 
     print(
-        "Iniciando Trilay..."
+        "Fecha:",
+        FECHA_BUSQUEDA
+    )
+
+    print(
+        "Cliente:",
+        CLIENTE.upper()
+    )
+
+
+    # =====================================================
+    # 1. LOGIN
+    # =====================================================
+
+    print()
+    print(
+        "Iniciando sesión..."
     )
 
 
@@ -193,12 +180,7 @@ try:
     )
 
 
-    print(
-        "Credenciales completadas."
-    )
-
-
-    boton_ingresar = espera.until(
+    boton_login = espera.until(
         EC.element_to_be_clickable(
             (
                 By.XPATH,
@@ -208,28 +190,16 @@ try:
     )
 
 
-    boton_ingresar.click()
-
-
-    print(
-        "Login enviado."
-    )
-
-    print(
-        "Esperando escritorio..."
-    )
+    boton_login.click()
 
 
     WebDriverWait(
         driver,
         60
     ).until(
-
         lambda navegador:
-
-        "escritorio.asp"
-        in navegador.current_url.lower()
-
+            "escritorio.asp"
+            in navegador.current_url.lower()
     )
 
 
@@ -255,14 +225,12 @@ try:
         driver,
         30
     ).until(
-
         EC.presence_of_element_located(
             (
                 By.ID,
                 "numCodJerarquia"
             )
         )
-
     )
 
 
@@ -291,18 +259,12 @@ try:
     if resultado_mendoza != "7":
 
         raise Exception(
-            "No se pudo seleccionar "
-            "MENDOZA."
+            "No se pudo seleccionar MENDOZA."
         )
 
 
     print(
-        "MENDOZA seleccionada."
-    )
-
-
-    print(
-        "Esperando carga de Mendoza..."
+        "MENDOZA seleccionada correctamente."
     )
 
 
@@ -324,16 +286,13 @@ try:
             driver,
             30
         ).until(
-
             EC.presence_of_element_located(
                 (
                     By.XPATH,
-
                     "//*[@id='trilay-escritorio']"
                     "//*[normalize-space(text())='Ventas']"
                 )
             )
-
         )
     )
 
@@ -349,11 +308,6 @@ try:
     )
 
 
-    print(
-        "Esperando grilla..."
-    )
-
-
     time.sleep(6)
 
 
@@ -363,7 +317,7 @@ try:
 
     print()
     print(
-        "Buscando iframe de Ventas..."
+        "Entrando al iframe de Ventas..."
     )
 
 
@@ -372,18 +326,15 @@ try:
             driver,
             30
         ).until(
-
             EC.presence_of_element_located(
                 (
                     By.XPATH,
-
                     "//iframe[contains("
                     "@src,"
                     "'ventas/ventas.asp'"
                     ")]"
                 )
             )
-
         )
     )
 
@@ -394,7 +345,7 @@ try:
 
 
     print(
-        "Entramos al iframe de Ventas."
+        "Iframe de Ventas correcto."
     )
 
 
@@ -402,222 +353,1036 @@ try:
 
 
     # =====================================================
-    # 5. CONFIGURAR FILTROS
+    # 5. LOCALIZAR LOS CAMPOS REALES
     # =====================================================
 
     print()
     print(
-        "Configurando filtros..."
+        "Localizando los campos reales de fecha..."
     )
 
 
-    resultado_filtros = (
-        driver.execute_script(
-            """
-            var fechaHoy = arguments[0];
-            var cliente = arguments[1];
+    resultado_campos = driver.execute_script(
+        """
+        var fechaDeseada =
+            arguments[0];
 
-            var inputs =
-                document.getElementsByTagName(
-                    'input'
-                );
-
-            var visibles = [];
+        var clienteDeseado =
+            arguments[1];
 
 
-            for (
-                var i = 0;
-                i < inputs.length;
-                i++
-            ) {
-
-                var input =
-                    inputs[i];
-
-                var rect =
-                    input.getBoundingClientRect();
-
-
-                if (
-                    rect.width <= 0 ||
-                    rect.height <= 0
-                ) {
-                    continue;
-                }
-
-
-                visibles.push({
-                    elemento: input,
-                    x: rect.left,
-                    valor: input.value || ''
-                });
-
-            }
-
-
-            visibles.sort(
-                function(a, b) {
-                    return a.x - b.x;
-                }
+        var inputs =
+            document.getElementsByTagName(
+                'input'
             );
 
 
-            // -----------------------------
-            // IDENTIFICAR FECHAS
-            // -----------------------------
-
-            var fechas = [];
+        var visibles =
+            [];
 
 
-            for (
-                var j = 0;
-                j < visibles.length;
-                j++
+        for (
+            var i = 0;
+            i < inputs.length;
+            i++
+        ) {
+
+            var input =
+                inputs[i];
+
+            var rect =
+                input.getBoundingClientRect();
+
+
+            if (
+                rect.width <= 0 ||
+                rect.height <= 0
+            ) {
+                continue;
+            }
+
+
+            visibles.push({
+
+                elemento:
+                    input,
+
+                x:
+                    rect.left,
+
+                y:
+                    rect.top,
+
+                derecha:
+                    rect.right,
+
+                valor:
+                    input.value || ''
+            });
+        }
+
+
+        if (
+            visibles.length == 0
+        ) {
+
+            return {
+                ok: false,
+                error:
+                    'NO_INPUTS_VISIBLES'
+            };
+        }
+
+
+        // =========================================
+        // BUSCAR EL CAMPO DEL CLIENTE
+        // =========================================
+
+        var buscador =
+            null;
+
+        var infoBuscador =
+            null;
+
+        var mayorX =
+            -999999;
+
+
+        for (
+            var j = 0;
+            j < visibles.length;
+            j++
+        ) {
+
+            var info =
+                visibles[j];
+
+            var valor =
+                info.valor;
+
+
+            if (
+                /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/
+                .test(valor)
+            ) {
+                continue;
+            }
+
+
+            if (
+                info.x > mayorX
             ) {
 
-                var valor =
-                    visibles[j].valor;
+                mayorX =
+                    info.x;
 
+                buscador =
+                    info.elemento;
+
+                infoBuscador =
+                    info;
+            }
+        }
+
+
+        if (!buscador) {
+
+            return {
+                ok: false,
+                error:
+                    'NO_BUSCADOR'
+            };
+        }
+
+
+        // =========================================
+        // BUSCAR FECHAS A LA IZQUIERDA
+        // DEL CAMPO CLIENTE
+        // =========================================
+
+        var candidatasFecha =
+            [];
+
+
+        for (
+            var k = 0;
+            k < visibles.length;
+            k++
+        ) {
+
+            var candidato =
+                visibles[k];
+
+
+            if (
+                candidato.elemento
+                == buscador
+            ) {
+                continue;
+            }
+
+
+            var mismaFila =
+                Math.abs(
+                    candidato.y -
+                    infoBuscador.y
+                ) <= 12;
+
+
+            var izquierda =
+                candidato.derecha
+                <=
+                infoBuscador.x + 5;
+
+
+            if (
+                !mismaFila ||
+                !izquierda
+            ) {
+                continue;
+            }
+
+
+            if (
+                /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/
+                .test(
+                    candidato.valor
+                )
+            ) {
+
+                candidatasFecha.push(
+                    candidato
+                );
+            }
+        }
+
+
+        if (
+            candidatasFecha.length < 2
+        ) {
+
+            return {
+                ok: false,
+                error:
+                    'NO_DOS_FECHAS',
+                cantidad:
+                    candidatasFecha.length
+            };
+        }
+
+
+        // Las ordenamos desde la más cercana
+        // al buscador hacia la izquierda.
+
+        candidatasFecha.sort(
+            function(a, b) {
+                return b.x - a.x;
+            }
+        );
+
+
+        var fechaHasta =
+            candidatasFecha[0]
+            .elemento;
+
+
+        var fechaDesde =
+            candidatasFecha[1]
+            .elemento;
+
+
+        function asignarFecha(
+            campo,
+            valor
+        ) {
+
+            try {
+                campo.focus();
+            } catch(e) {}
+
+
+            campo.value =
+                valor;
+
+
+            try {
 
                 if (
-                    /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/
-                    .test(valor)
+                    campo.fireEvent
                 ) {
 
-                    fechas.push(
-                        visibles[j].elemento
+                    campo.fireEvent(
+                        'onchange'
                     );
 
+                    campo.fireEvent(
+                        'onblur'
+                    );
+
+                    campo.fireEvent(
+                        'onkeyup'
+                    );
                 }
 
-            }
+            } catch(e) {}
 
 
-            if (fechas.length < 2) {
-
-                return {
-                    ok: false,
-                    error: 'NO_FECHAS'
-                };
-
-            }
+            try {
+                campo.blur();
+            } catch(e) {}
+        }
 
 
-            fechas[0].value =
-                fechaHoy;
-
-            fechas[1].value =
-                fechaHoy;
-
-
-            // -----------------------------
-            // IDENTIFICAR BUSCADOR
-            // -----------------------------
-
-            var buscador = null;
-
-            var mayorX = -1;
+        asignarFecha(
+            fechaDesde,
+            fechaDeseada
+        );
 
 
-            for (
-                var k = 0;
-                k < visibles.length;
-                k++
+        asignarFecha(
+            fechaHasta,
+            fechaDeseada
+        );
+
+
+        buscador.value =
+            clienteDeseado;
+
+
+        try {
+
+            if (
+                buscador.fireEvent
             ) {
 
-                var campo =
-                    visibles[k].elemento;
+                buscador.fireEvent(
+                    'onchange'
+                );
 
-                var valorCampo =
-                    campo.value || '';
-
-
-                if (
-                    /^\\d{1,2}\\/\\d{1,2}\\/\\d{4}$/
-                    .test(valorCampo)
-                ) {
-                    continue;
-                }
-
-
-                if (
-                    visibles[k].x > mayorX
-                ) {
-
-                    mayorX =
-                        visibles[k].x;
-
-                    buscador =
-                        campo;
-
-                }
-
+                buscador.fireEvent(
+                    'onkeyup'
+                );
             }
 
+        } catch(e) {}
 
-            if (!buscador) {
+
+        // Guardamos las referencias.
+        window._trilayFechaDesde =
+            fechaDesde;
+
+        window._trilayFechaHasta =
+            fechaHasta;
+
+        window._trilayBuscador =
+            buscador;
+
+
+        return {
+
+            ok:
+                true,
+
+            fechaDesde:
+                fechaDesde.value,
+
+            fechaHasta:
+                fechaHasta.value,
+
+            cliente:
+                buscador.value
+        };
+        """,
+        FECHA_BUSQUEDA,
+        CLIENTE
+    )
+
+
+    if not resultado_campos.get(
+        "ok"
+    ):
+
+        print(
+            resultado_campos
+        )
+
+        raise Exception(
+            "No se pudieron localizar "
+            "los campos del filtro."
+        )
+
+
+    print()
+    print(
+        "Campos modificados:"
+    )
+
+    print(
+        "DESDE:",
+        resultado_campos[
+            "fechaDesde"
+        ]
+    )
+
+    print(
+        "HASTA:",
+        resultado_campos[
+            "fechaHasta"
+        ]
+    )
+
+    print(
+        "CLIENTE:",
+        resultado_campos[
+            "cliente"
+        ]
+    )
+
+
+    time.sleep(3)
+
+
+    # =====================================================
+    # 6. VERIFICAR VISUALMENTE LOS FILTROS
+    # =====================================================
+
+    print()
+    print(
+        "Verificando visualmente las fechas..."
+    )
+
+
+    verificacion_campos = (
+        driver.execute_script(
+            """
+            var desde =
+                window._trilayFechaDesde;
+
+            var hasta =
+                window._trilayFechaHasta;
+
+            var buscador =
+                window._trilayBuscador;
+
+
+            if (
+                !desde ||
+                !hasta ||
+                !buscador
+            ) {
 
                 return {
-                    ok: false,
-                    error: 'NO_BUSCADOR'
+                    ok: false
                 };
-
             }
-
-
-            buscador.value =
-                cliente;
-
-
-            buscador.focus();
-
-
-            window._buscadorAtomo =
-                buscador;
 
 
             return {
-                ok: true,
 
-                fechaDesde:
-                    fechas[0].value,
+                ok:
+                    true,
 
-                fechaHasta:
-                    fechas[1].value,
+                desde:
+                    desde.value,
+
+                hasta:
+                    hasta.value,
 
                 cliente:
                     buscador.value
             };
-            """,
-
-            FECHA_HOY,
-            CLIENTE
+            """
         )
     )
 
 
-    if not resultado_filtros.get(
+    if not verificacion_campos.get(
         "ok"
     ):
 
         raise Exception(
-            "No se pudieron configurar "
+            "No se pudieron verificar "
             "los filtros."
         )
 
 
+    print()
     print(
-        "Fecha desde:",
-        FECHA_HOY
+        "VALOR VISUAL DESDE:",
+        verificacion_campos[
+            "desde"
+        ]
     )
 
     print(
-        "Fecha hasta:",
-        FECHA_HOY
+        "VALOR VISUAL HASTA:",
+        verificacion_campos[
+            "hasta"
+        ]
     )
 
     print(
-        "Cliente: ATOMO"
+        "VALOR VISUAL CLIENTE:",
+        verificacion_campos[
+            "cliente"
+        ]
+    )
+
+
+    if (
+        verificacion_campos[
+            "desde"
+        ]
+        != FECHA_BUSQUEDA
+    ):
+
+        raise Exception(
+            "La fecha DESDE "
+            "no quedó correctamente."
+        )
+
+
+    if (
+        verificacion_campos[
+            "hasta"
+        ]
+        != FECHA_BUSQUEDA
+    ):
+
+        raise Exception(
+            "La fecha HASTA "
+            "no quedó correctamente."
+        )
+
+
+    if (
+        verificacion_campos[
+            "cliente"
+        ].lower()
+        != CLIENTE.lower()
+    ):
+
+        raise Exception(
+            "El cliente ATOMO "
+            "no quedó correctamente."
+        )
+
+
+    print()
+    print("==========================================")
+    print(" FILTROS VERIFICADOS CORRECTAMENTE")
+    print("==========================================")
+    print()
+
+    print(
+        "DESDE:",
+        FECHA_BUSQUEDA
+    )
+
+    print(
+        "HASTA:",
+        FECHA_BUSQUEDA
+    )
+
+    print(
+        "CLIENTE:",
+        CLIENTE.upper()
+    )
+
+
+    # =====================================================
+    # 7. EJECUTAR BÚSQUEDA REAL
+    # =====================================================
+
+    print()
+    print(
+        "Ejecutando refreshlistadocoti()..."
+    )
+
+
+    resultado_busqueda = (
+        driver.execute_script(
+            """
+            if (
+                typeof refreshlistadocoti
+                === 'function'
+            ) {
+
+                refreshlistadocoti();
+
+                return 'REFRESH_LOCAL';
+            }
+
+
+            try {
+
+                if (
+                    parent &&
+                    typeof parent.refreshlistadocoti
+                    === 'function'
+                ) {
+
+                    parent.refreshlistadocoti();
+
+                    return 'REFRESH_PARENT';
+                }
+
+            } catch(e) {}
+
+
+            return 'NO_FUNCION';
+            """
+        )
+    )
+
+
+    print(
+        "Resultado búsqueda:",
+        resultado_busqueda
+    )
+
+
+    if (
+        resultado_busqueda
+        == "NO_FUNCION"
+    ):
+
+        raise Exception(
+            "No se pudo ejecutar "
+            "la búsqueda."
+        )
+
+
+    print(
+        "Esperando resultados..."
+    )
+
+    time.sleep(8)
+
+
+    # =====================================================
+    # 8. BUSCAR EL LISTADO FILTRADO
+    # =====================================================
+
+    print()
+    print(
+        "Buscando listado filtrado..."
+    )
+
+
+    listado_encontrado = (
+        False
+    )
+
+    cantidad_facturas = (
+        0
+    )
+
+
+    try:
+
+        cantidad_facturas = (
+            driver.execute_script(
+                """
+                return document
+                    .getElementsByName(
+                        'chkborrar'
+                    ).length;
+                """
+            )
+        )
+
+
+        if (
+            cantidad_facturas > 0
+        ):
+
+            listado_encontrado = (
+                True
+            )
+
+    except Exception:
+        pass
+
+
+    # Si no está en el documento actual,
+    # buscar dentro de iframes internos.
+
+    if not listado_encontrado:
+
+        frames = (
+            driver.find_elements(
+                By.TAG_NAME,
+                "iframe"
+            )
+        )
+
+
+        for frame in frames:
+
+            try:
+
+                driver.switch_to.frame(
+                    frame
+                )
+
+
+                cantidad_temporal = (
+                    driver.execute_script(
+                        """
+                        return document
+                            .getElementsByName(
+                                'chkborrar'
+                            ).length;
+                        """
+                    )
+                )
+
+
+                if (
+                    cantidad_temporal > 0
+                ):
+
+                    cantidad_facturas = (
+                        cantidad_temporal
+                    )
+
+                    listado_encontrado = (
+                        True
+                    )
+
+                    break
+
+
+                driver.switch_to.parent_frame()
+
+
+            except Exception:
+
+                try:
+                    driver.switch_to.parent_frame()
+
+                except Exception:
+                    pass
+
+
+    if not listado_encontrado:
+
+        raise Exception(
+            "No se encontró el listado "
+            "de facturas."
+        )
+
+
+    print(
+        "Facturas encontradas:",
+        cantidad_facturas
+    )
+
+
+    # =====================================================
+    # 9. VERIFICAR FACTURAS RESULTANTES
+    # =====================================================
+
+    print()
+    print(
+        "Verificando las facturas "
+        "devueltas por Trilay..."
+    )
+
+
+    verificacion_resultados = (
+        driver.execute_script(
+            """
+            var fechaEsperada =
+                arguments[0];
+
+            var clienteEsperado =
+                arguments[1]
+                .toUpperCase();
+
+
+            var checks =
+                document.getElementsByName(
+                    'chkborrar'
+                );
+
+
+            var correctas =
+                0;
+
+            var incorrectas =
+                0;
+
+
+            for (
+                var i = 0;
+                i < checks.length;
+                i++
+            ) {
+
+                var check =
+                    checks[i];
+
+
+                var fecha =
+                    check.getAttribute(
+                        'artfechacomprobante'
+                    ) || '';
+
+
+                var fila =
+                    check;
+
+
+                while (
+                    fila &&
+                    fila.tagName != 'TR'
+                ) {
+
+                    fila =
+                        fila.parentNode;
+                }
+
+
+                var textoFila =
+                    '';
+
+
+                if (fila) {
+
+                    textoFila =
+                        (
+                            fila.innerText ||
+                            fila.textContent ||
+                            ''
+                        ).toUpperCase();
+                }
+
+
+                var fechaOK =
+                    fecha
+                    == fechaEsperada;
+
+
+                var clienteOK =
+                    textoFila.indexOf(
+                        clienteEsperado
+                    ) >= 0;
+
+
+                if (
+                    fechaOK &&
+                    clienteOK
+                ) {
+
+                    correctas++;
+
+                } else {
+
+                    incorrectas++;
+                }
+            }
+
+
+            return {
+
+                total:
+                    checks.length,
+
+                correctas:
+                    correctas,
+
+                incorrectas:
+                    incorrectas
+            };
+            """,
+            FECHA_BUSQUEDA,
+            "ATOMO"
+        )
+    )
+
+
+    print()
+    print(
+        "TOTAL:",
+        verificacion_resultados[
+            "total"
+        ]
+    )
+
+    print(
+        "CORRECTAS:",
+        verificacion_resultados[
+            "correctas"
+        ]
+    )
+
+    print(
+        "INCORRECTAS:",
+        verificacion_resultados[
+            "incorrectas"
+        ]
+    )
+
+
+    if (
+        verificacion_resultados[
+            "total"
+        ]
+        == 0
+    ):
+
+        raise Exception(
+            "No se encontraron facturas."
+        )
+
+
+    if (
+        verificacion_resultados[
+            "incorrectas"
+        ]
+        > 0
+    ):
+
+        raise Exception(
+            "El filtro devolvió facturas "
+            "incorrectas. "
+            "Se cancela la impresión."
+        )
+
+
+    print()
+    print("==========================================")
+    print(" FILTRO APLICADO CORRECTAMENTE")
+    print("==========================================")
+    print()
+
+    print(
+        "Todas las facturas son de "
+        "ATOMO y del",
+        FECHA_BUSQUEDA
+    )
+
+    print()
+    print(
+        "Cantidad:",
+        verificacion_resultados[
+            "correctas"
+        ]
+    )
+
+
+    # =====================================================
+    # 10. SELECCIONAR TODAS
+    # =====================================================
+
+    print()
+    print(
+        "Seleccionando todas las "
+        "facturas filtradas..."
+    )
+
+
+    resultado_seleccion = (
+        driver.execute_script(
+            """
+            if (
+                typeof seleccionar
+                === 'function'
+            ) {
+
+                seleccionar(true);
+
+                return 'FUNCION_SELECCIONAR';
+            }
+
+
+            var checks =
+                document.getElementsByName(
+                    'chkborrar'
+                );
+
+
+            for (
+                var i = 0;
+                i < checks.length;
+                i++
+            ) {
+
+                checks[i].checked =
+                    true;
+            }
+
+
+            return 'SELECCION_DIRECTA';
+            """
+        )
+    )
+
+
+    print(
+        "Método de selección:",
+        resultado_seleccion
+    )
+
+
+    cantidad_seleccionadas = (
+        driver.execute_script(
+            """
+            var checks =
+                document.getElementsByName(
+                    'chkborrar'
+                );
+
+            var cantidad =
+                0;
+
+
+            for (
+                var i = 0;
+                i < checks.length;
+                i++
+            ) {
+
+                if (
+                    checks[i].checked
+                ) {
+
+                    cantidad++;
+                }
+            }
+
+
+            return cantidad;
+            """
+        )
+    )
+
+
+    print(
+        "Facturas seleccionadas:",
+        cantidad_seleccionadas
+    )
+
+
+    if (
+        cantidad_seleccionadas
+        !=
+        verificacion_resultados[
+            "correctas"
+        ]
+    ):
+
+        raise Exception(
+            "No se seleccionaron todas "
+            "las facturas."
+        )
+
+
+    print(
+        "Todas las facturas fueron "
+        "seleccionadas correctamente."
     )
 
 
@@ -625,401 +1390,565 @@ try:
 
 
     # =====================================================
-    # 6. EJECUTAR BÚSQUEDA
+    # 11. OBTENER CÓDIGOS DE FACTURA
     # =====================================================
 
     print()
     print(
-        "Ejecutando búsqueda..."
+        "Preparando impresión múltiple..."
     )
 
 
-    resultado_buscar = (
+    codigos_facturas = (
         driver.execute_script(
             """
-            var buscador =
-                window._buscadorAtomo;
-
-
-            if (!buscador) {
-                return 'NO_BUSCADOR';
-            }
-
-
-            var rectBuscador =
-                buscador.getBoundingClientRect();
-
-
-            var elementos =
-                document.getElementsByTagName(
-                    '*'
+            var checks =
+                document.getElementsByName(
+                    'chkborrar'
                 );
 
 
-            var boton = null;
-
-            var mejorDistancia =
-                99999;
+            var codigos =
+                [];
 
 
             for (
                 var i = 0;
-                i < elementos.length;
+                i < checks.length;
                 i++
             ) {
 
-                var elemento =
-                    elementos[i];
-
-
                 if (
-                    elemento == buscador
+                    checks[i].checked
                 ) {
-                    continue;
-                }
 
-
-                var rect =
-                    elemento.getBoundingClientRect();
-
-
-                if (
-                    rect.width <= 0 ||
-                    rect.height <= 0
-                ) {
-                    continue;
-                }
-
-
-                var distanciaX =
-                    rect.left -
-                    rectBuscador.right;
-
-
-                var diferenciaY =
-                    Math.abs(
-                        rect.top -
-                        rectBuscador.top
+                    codigos.push(
+                        checks[i].value
                     );
-
-
-                if (
-                    distanciaX >= 0 &&
-                    distanciaX <= 60 &&
-                    diferenciaY <= 15 &&
-                    distanciaX < mejorDistancia
-                ) {
-
-                    boton =
-                        elemento;
-
-                    mejorDistancia =
-                        distanciaX;
-
                 }
-
             }
 
 
-            if (boton) {
+            return codigos;
+            """
+        )
+    )
 
-                try {
 
-                    boton.click();
+    if not codigos_facturas:
 
-                    return 'CLICK';
+        raise Exception(
+            "No hay facturas "
+            "seleccionadas."
+        )
 
+
+    print(
+        "Facturas para imprimir:",
+        len(codigos_facturas)
+    )
+
+
+    cadena_codigos = (
+        "|".join(
+            codigos_facturas
+        )
+    )
+
+
+    print(
+        "Códigos preparados correctamente."
+    )
+
+
+    # =====================================================
+    # 12. ABRIR IMPRESIÓN MÚLTIPLE DIRECTAMENTE
+    # =====================================================
+
+    print()
+    print(
+        "Abriendo directamente "
+        "Imprimir Múltiples Facturas..."
+    )
+
+
+    url_impresion = (
+        "ImprimirMultiplesFacturas.asp"
+        "?accion=INICIO"
+        "&CodJerarquia=7"
+        "&codi="
+        + cadena_codigos
+    )
+
+
+    print(
+        "Página de impresión preparada."
+    )
+
+
+    resultado_motor = (
+        driver.execute_script(
+            """
+            var url =
+                arguments[0];
+
+
+            var contenedor =
+                document.getElementById(
+                    'ImpresionMultiple'
+                );
+
+
+            if (!contenedor) {
+
+                return 'NO_CONTENEDOR';
+            }
+
+
+            contenedor.style.display =
+                'block';
+
+
+            var motor =
+                document.getElementById(
+                    'motor'
+                );
+
+
+            if (!motor) {
+
+                motor =
+                    document.createElement(
+                        'iframe'
+                    );
+
+
+                motor.id =
+                    'motor';
+
+                motor.name =
+                    'motor';
+
+                motor.style.width =
+                    '550px';
+
+                motor.style.height =
+                    '300px';
+
+                motor.style.display =
+                    'block';
+
+
+                contenedor.innerHTML =
+                    '';
+
+
+                contenedor.appendChild(
+                    motor
+                );
+            }
+
+
+            motor.src =
+                url;
+
+
+            return 'OK';
+            """,
+            url_impresion
+        )
+    )
+
+
+    if resultado_motor != "OK":
+
+        raise Exception(
+            "No se pudo abrir "
+            "el módulo de impresión."
+        )
+
+
+    print(
+        "Módulo de impresión abierto."
+    )
+
+
+    time.sleep(6)
+
+
+    # =====================================================
+    # 13. ENTRAR AL IFRAME MOTOR
+    # =====================================================
+
+    print()
+    print(
+        "Entrando al módulo de impresión..."
+    )
+
+
+    iframe_motor = (
+        WebDriverWait(
+            driver,
+            30
+        ).until(
+            EC.presence_of_element_located(
+                (
+                    By.ID,
+                    "motor"
+                )
+            )
+        )
+    )
+
+
+    driver.switch_to.frame(
+        iframe_motor
+    )
+
+
+    print(
+        "Módulo de impresión cargado."
+    )
+
+
+    time.sleep(5)
+
+
+    # =====================================================
+    # 14. ESPERAR LISTA DE IMPRESORAS
+    # =====================================================
+
+    print()
+    print(
+        "Esperando lista de impresoras..."
+    )
+
+
+    WebDriverWait(
+        driver,
+        30
+    ).until(
+        EC.presence_of_element_located(
+            (
+                By.ID,
+                "cboImpresoras"
+            )
+        )
+    )
+
+
+    print(
+        "Lista de impresoras cargada."
+    )
+
+
+    # =====================================================
+    # 15. SELECCIONAR PDF
+    # =====================================================
+
+    print()
+    print(
+        "Seleccionando PDF..."
+    )
+
+
+    resultado_pdf = (
+        driver.execute_script(
+            """
+            var selector =
+                document.getElementById(
+                    'cboImpresoras'
+                );
+
+
+            if (!selector) {
+
+                return 'NO_SELECTOR';
+            }
+
+
+            selector.value =
+                'PDF';
+
+
+            try {
+
+                if (
+                    selector.fireEvent
+                ) {
+
+                    selector.fireEvent(
+                        'onchange'
+                    );
                 }
 
-                catch(e) {
+            } catch(e) {}
 
-                    try {
 
-                        boton.fireEvent(
-                            'onclick'
+            return selector.value;
+            """
+        )
+    )
+
+
+    print(
+        "Valor seleccionado:",
+        resultado_pdf
+    )
+
+
+    if resultado_pdf != "PDF":
+
+        raise Exception(
+            "No se pudo seleccionar PDF."
+        )
+
+
+    print(
+        "PDF seleccionado correctamente."
+    )
+
+
+    # =====================================================
+    # 16. VERIFICAR PDF
+    # =====================================================
+
+    impresora_actual = (
+        driver.execute_script(
+            """
+            var selector =
+                document.getElementById(
+                    'cboImpresoras'
+                );
+
+
+            if (!selector) {
+
+                return '';
+            }
+
+
+            return selector.value;
+            """
+        )
+    )
+
+
+    print(
+        "Impresora seleccionada:",
+        impresora_actual
+    )
+
+
+    if impresora_actual != "PDF":
+
+        raise Exception(
+            "La impresora seleccionada "
+            "no es PDF."
+        )
+
+
+    time.sleep(2)
+
+
+    # =====================================================
+    # 17. BOTÓN IMPRIMIR
+    # =====================================================
+
+    print()
+    print(
+        "Buscando botón IMPRIMIR..."
+    )
+
+
+    WebDriverWait(
+        driver,
+        30
+    ).until(
+        EC.presence_of_element_located(
+            (
+                By.ID,
+                "btComenzar"
+            )
+        )
+    )
+
+
+    print(
+        "Botón IMPRIMIR encontrado."
+    )
+
+
+    # =====================================================
+    # 18. HACER CLIC EN IMPRIMIR
+    # =====================================================
+
+    resultado_imprimir = (
+        driver.execute_script(
+            """
+            var boton =
+                document.getElementById(
+                    'btComenzar'
+                );
+
+
+            if (!boton) {
+
+                return false;
+            }
+
+
+            boton.click();
+
+
+            return true;
+            """
+        )
+    )
+
+
+    if not resultado_imprimir:
+
+        raise Exception(
+            "No se pudo presionar Imprimir."
+        )
+
+
+    print()
+    print("==========================================")
+    print(" IMPRESIÓN PDF INICIADA")
+    print("==========================================")
+    print()
+
+    print(
+        "Fecha:",
+        FECHA_BUSQUEDA
+    )
+
+    print(
+        "Cliente:",
+        CLIENTE.upper()
+    )
+
+    print(
+        "Facturas:",
+        len(codigos_facturas)
+    )
+
+    print(
+        "Impresora:",
+        "PDF"
+    )
+
+
+    # =====================================================
+    # 19. ESPERAR PROCESAMIENTO DE TODAS LAS FACTURAS
+    # =====================================================
+
+    print()
+    print(
+        "Esperando procesamiento "
+        "de las facturas..."
+    )
+
+
+    try:
+
+        WebDriverWait(
+            driver,
+            120
+        ).until(
+
+            lambda navegador:
+
+                int(
+                    navegador.execute_script(
+                        """
+                        var contador =
+                            document.getElementById(
+                                'porcentajeprocesado'
+                            );
+
+
+                        if (!contador) {
+                            return '0';
+                        }
+
+
+                        return (
+                            contador.innerHTML
+                            || '0'
                         );
-
-                        return 'FIREEVENT';
-
-                    }
-
-                    catch(e2) {}
-
-                }
-
-            }
-
-
-            return 'NO_ACCION';
-            """
+                        """
+                    )
+                    or "0"
+                )
+                >=
+                len(codigos_facturas)
         )
-    )
 
-
-    print(
-        "Método de búsqueda:",
-        resultado_buscar
-    )
-
-
-    print(
-        "Esperando resultados..."
-    )
-
-
-    time.sleep(7)
-
-
-    # =====================================================
-    # 7. BUSCAR FACTURAS RESULTANTES
-    # =====================================================
-
-    print()
-    print(
-        "Leyendo facturas filtradas..."
-    )
-
-
-    facturas = (
-        driver.execute_script(
-            """
-            var links =
-                document.getElementsByTagName(
-                    'a'
-                );
-
-            var resultados = [];
-
-
-            for (
-                var i = 0;
-                i < links.length;
-                i++
-            ) {
-
-                var link =
-                    links[i];
-
-
-                var texto =
-                    (
-                        link.innerText ||
-                        link.textContent ||
-                        ''
-                    );
-
-
-                texto =
-                    texto.replace(
-                        /^\\s+|\\s+$/g,
-                        ''
-                    );
-
-
-                if (
-                    texto.indexOf('FV/') == 0
-                ) {
-
-                    resultados.push({
-
-                        texto:
-                            texto,
-
-                        href:
-                            link.getAttribute(
-                                'href'
-                            ) || '',
-
-                        onclick:
-                            link.getAttribute(
-                                'onclick'
-                            ) || '',
-
-                        target:
-                            link.getAttribute(
-                                'target'
-                            ) || '',
-
-                        outerHTML:
-                            link.outerHTML || ''
-
-                    });
-
-                }
-
-            }
-
-
-            return resultados;
-            """
-        )
-    )
-
-
-    print()
-    print(
-        "Facturas encontradas:",
-        len(facturas)
-    )
-
-
-    if len(facturas) == 0:
 
         print()
         print(
-            "No hay facturas de ATOMO "
-            "para la fecha de hoy."
+            "Todas las facturas fueron procesadas."
         )
 
 
-    else:
+    except Exception:
 
+        # Esto NO lo tomamos como error general porque
+        # la impresión ya fue iniciada.
         print()
-
-        for numero, factura in enumerate(
-            facturas,
-            start=1
-        ):
-
-            print(
-                numero,
-                "-",
-                factura["texto"]
-            )
+        print(
+            "La impresión fue iniciada, "
+            "pero no se pudo confirmar "
+            "automáticamente el contador final."
+        )
 
 
     # =====================================================
-    # 8. GUARDAR DATOS DE LAS FACTURAS
+    # 20. RESUMEN FINAL
     # =====================================================
 
-    archivo_facturas = (
-        BASE_DIR
-        / "facturas_atomo_encontradas.txt"
+    print()
+    print("==========================================")
+    print(" PROCESO COMPLETADO")
+    print("==========================================")
+    print()
+
+    print(
+        "Fecha:",
+        FECHA_BUSQUEDA
     )
 
+    print(
+        "Cliente:",
+        CLIENTE.upper()
+    )
 
-    with open(
-        archivo_facturas,
-        "w",
-        encoding="utf-8",
-        errors="ignore"
-    ) as archivo:
-
-
-        archivo.write(
-            "FECHA: "
-            + FECHA_HOY
-            + "\n"
-        )
-
-        archivo.write(
-            "CLIENTE: ATOMO\n"
-        )
-
-        archivo.write(
-            "CANTIDAD: "
-            + str(len(facturas))
-            + "\n"
-        )
-
-        archivo.write(
-            "\n"
-        )
-
-
-        for numero, factura in enumerate(
-            facturas,
-            start=1
-        ):
-
-
-            archivo.write(
-                "====================================\n"
-            )
-
-            archivo.write(
-                "FACTURA "
-                + str(numero)
-                + "\n"
-            )
-
-            archivo.write(
-                "====================================\n"
-            )
-
-
-            archivo.write(
-                "TEXTO: "
-                + factura["texto"]
-                + "\n"
-            )
-
-
-            archivo.write(
-                "HREF: "
-                + factura["href"]
-                + "\n"
-            )
-
-
-            archivo.write(
-                "ONCLICK: "
-                + factura["onclick"]
-                + "\n"
-            )
-
-
-            archivo.write(
-                "TARGET: "
-                + factura["target"]
-                + "\n"
-            )
-
-
-            archivo.write(
-                "HTML:\n"
-                + factura["outerHTML"]
-                + "\n"
-            )
-
-
-            archivo.write(
-                "\n"
-            )
-
+    print(
+        "Facturas enviadas a PDF:",
+        len(codigos_facturas)
+    )
 
     print()
     print(
-        "Información guardada en:"
-    )
-
-    print(
-        archivo_facturas
+        "Trilay terminó el proceso de "
+        "impresión múltiple."
     )
 
 
-    print()
-    print(
-        "Carpeta de futuras descargas:"
-    )
-
-    print(
-        DOWNLOADS_DIR
-    )
-
-
-    print()
-    print(
-        "FILTRO TERMINADO CORRECTAMENTE."
-    )
-
+# =========================================================
+# ERROR GENERAL
+# =========================================================
 
 except Exception as error:
 
     print()
-    print(
-        "ERROR DURANTE LA AUTOMATIZACIÓN"
-    )
+    print("==========================================")
+    print(" ERROR DURANTE LA AUTOMATIZACIÓN")
+    print("==========================================")
+    print()
 
     print(
         type(error).__name__
@@ -1030,9 +1959,12 @@ except Exception as error:
     )
 
 
+# =========================================================
+# MANTENER EL NAVEGADOR ABIERTO
+# =========================================================
+
 input(
-    "\nPresioná ENTER para cerrar "
-    "el navegador..."
+    "\nPresioná ENTER para cerrar..."
 )
 
 

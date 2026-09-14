@@ -1,0 +1,207 @@
+<HTML xmlns="http://www.w3.org/1999/xhtml"><HEAD><TITLE>Imprimir Comprobantes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        </TITLE>
+<META content="text/html; charset=ISO-8859-1" http-equiv=Content-Type><LINK rel=stylesheet type=text/css href="../admin.css?v=1.15">
+<SCRIPT language=Javascript src="../js/FuncionesComunes.js?cache="></SCRIPT>
+
+<SCRIPT>
+
+            DeshabilitarEspereAutomatico=true            
+            var Lista;
+            var CodJerarquia = '7';
+            var C_CodFactura = '2342564|2342586|2342560|2342584|2342578|2342570|2342565|2342577|2342562|2342569|2342563|2342557|2342561';          
+
+            var Puntero;
+            var CantItems;
+            var ProcesoCancelado;
+            var Codigos;
+
+                      
+			function Inicio()		
+			{
+               
+                var Destino=document.all["tdImpresoras"];
+                ajaxHTMLasincrono("ImprimirMultiplesFacturas.asp?accion=LISTAR_IMPRESORAS",Destino)
+			    //ComenzarProceso();	    
+         
+			}
+            
+
+			function ComenzarProceso() {
+                var Impresora=document.all["cboImpresoras"].value;
+                if(Impresora==""){
+                    alert("Selecciones una impresora");
+                    return
+                }
+                
+                ajaxHTML("ImprimirMultiplesFacturas.asp?accion=GUARDAR_IMPRESORA&Impresora="+escape(document.all["cboImpresoras"].value))
+
+                Puntero=0;
+                CantItems=0;
+                ProcesoCancelado=false;
+                    
+                Codigos=C_CodFactura.split("|");
+                CantItems=Codigos.length;        
+              
+                document.getElementById("imgTrabajando").style.display="";
+            	document.getElementById("btComenzar").style.display = "none";		       
+			    document.getElementById("btDetener").style.display = "";
+                document.all["cboImpresoras"].disabled=true;
+
+			       
+			    if (Puntero < CantItems) {
+			        setTimeout("Generar()",50);
+			    }
+			}
+             
+
+			function DetenerProceso(){ 
+               document.getElementById("btDetener").disabled=true;
+               ProcesoCancelado=true
+            }
+
+            function Generar() {     
+                  
+                var CodFactura = Codigos[Puntero];            
+                var Impresora=document.all["cboImpresoras"].value;     
+               
+                 var OBJ = new ReporteVBNet();
+                 OBJ.TipoReporte = "FAC"
+				 if (Impresora=="PDF"){
+					 OBJ.Version=".V5"
+					 OBJ.Parametros = CodJerarquia+"|" + CodFactura + "|2|0|"+Impresora
+				 }
+				 else{
+					 OBJ.Parametros = CodJerarquia+"|" + CodFactura + "|0|1|"+Impresora
+				 }
+                 
+                 OBJ.TipoImp = "1"           
+                 OBJ.Generar();
+
+            }
+            
+			function ProcesoFinalizado() {
+
+			    Puntero += 1;
+			    ActualizarProgreso(CantItems, Puntero)
+			    if ((Puntero < CantItems) && !ProcesoCancelado) {                                             
+                    setTimeout("Generar()",50);
+			    } else {			       
+			           
+			        document.getElementById("btDetener").style.display = "none";                   
+                    parent.returnValue=true;
+                    setTimeout("window.close();");               
+
+			    }
+			   
+
+			}
+			
+            
+
+             function ReplaceAlll(obj,stringToFind,stringToReplace)
+             {
+	              
+
+	            var index = obj.value.indexOf(stringToFind);
+
+		            while(index != -1){
+
+			            obj.value = obj.value.replace(stringToFind,stringToReplace);
+
+			            index = obj.value.indexOf(stringToFind);			
+
+		            }
+
+             }	
+			
+			function MostrarProgreso()
+			{	
+				document.getElementById("TablaPrincipal").style.display="none";
+				var capa=document.getElementById("div_barra_progreso");				
+				capa.style.display="";
+				document.getElementById("td_exportar").style.display = "";
+				
+			}		
+			
+			function OcultarProgreso()
+			{			
+				var capa=document.getElementById("div_barra_progreso");				
+				capa.style.display="none";
+				document.getElementById("TablaPrincipal").style.display="";
+				document.getElementById("td_exportar").style.display="none";
+			}		
+			
+			function ActualizarProgreso(total,procesado)
+			{
+			    try {
+                    var CantPix=parseInt((procesado*500)/total);
+				    var Porcentaje=procesado.toString();
+
+				    document.getElementById("td_procesado").width = CantPix;				    
+				    if (CantPix == 500) {
+				        document.getElementById("td_restante").width = "";
+                    }
+				    else
+                    {							
+					    document.getElementById("td_restante").width=500-CantPix;
+				    }
+							
+				    document.getElementById("porcentajeprocesado").innerHTML=Porcentaje;
+				}catch(e){}
+				
+			}			
+			
+			function makevisible(cur,which)
+			{
+				if (which==0) {cur.opacity=100;}
+				else {cur.opacity=80;}
+			}					
+						
+			
+            function ImportacionFinalizada() {
+                
+                ActualizarProgreso(1, 1);
+                document.getElementById("btDetener").style.display = "none";
+            }
+
+            function DetenerProceso() {               
+                ProcesoCancelado=true;
+                document.getElementById("btDetener").style.display = "none";
+                
+                setTimeout('parent.returnValue=true;', 10); 
+            }
+           
+		</SCRIPT>
+</HEAD>
+<BODY leftMargin=0 topMargin=0 scroll=no>
+<DIV class=directorio style="HEIGHT: 45px; WIDTH: 550px">
+<CENTER><BR><SPAN class=titulo><B>Imprimir Multiples Facturas</B></SPAN> </CENTER></DIV><BR>
+<DIV>
+<CENTER>
+<TABLE style="FONT-SIZE: xx-small; WIDTH: 500px" width=500 border=0>
+<TBODY>
+<TR class=datos>
+<TD height=20 width=150>Impresora Destino: </TD>
+<TD id=tdImpresoras width=350><SELECT tabIndex=1 id=cboImpresoras title="Impresoras configuradas en el servidor" class=datosin style="WIDTH: 100%" name=cboImpresoras> <OPTION selected value="">Seleccione</OPTION> <OPTION title="Microsoft Print to PDF" value="Microsoft Print to PDF">Microsoft Print to PDF</OPTION> <OPTION title=PRT01 value=PRT01>PRT01</OPTION> <OPTION title=PSJ11 value=PSJ11>PSJ11</OPTION> <OPTION title=PRT02 value=PRT02>PRT02</OPTION> <OPTION title=PSA10 value=PSA10>PSA10</OPTION> <OPTION title="RICOH P 311 SALTA" value="RICOH P 311 SALTA">RICOH P 311 SALTA</OPTION> <OPTION title="Lexmark Universal v2 XL" value="Lexmark Universal v2 XL">Lexmark Universal v2 XL</OPTION> <OPTION title="Lexmark Universal v2 XL (Copy 1)" value="Lexmark Universal v2 XL (Copy 1)">Lexmark Universal v2 XL (Copy 1)</OPTION> <OPTION title=PSJ10 value=PSJ10>PSJ10</OPTION> <OPTION title=PSJ13 value=PSJ13>PSJ13</OPTION> <OPTION title="Microsoft XPS Document Writer (redirected 2/copy 1)" value="Microsoft XPS Document Writer (redirected 2/copy 1)">Microsoft XPS Document Writer (redirected 2/copy 1)</OPTION> <OPTION title="Lexmark MS810 Series XL (redirected 5)" value="Lexmark MS810 Series XL (redirected 5)">Lexmark MS810 Series XL (redirected 5)</OPTION> <OPTION title="Lexmark XM5100 Series XL (redirected 5)" value="Lexmark XM5100 Series XL (redirected 5)">Lexmark XM5100 Series XL (redirected 5)</OPTION> <OPTION title="PRT01 (redirected 5)" value="PRT01 (redirected 5)">PRT01 (redirected 5)</OPTION> <OPTION title=PSL10 value=PSL10>PSL10</OPTION> <OPTION title="Brother DCP-L5650DN series (redirected 2)" value="Brother DCP-L5650DN series (redirected 2)">Brother DCP-L5650DN series (redirected 2)</OPTION> <OPTION title=PRT03 value=PRT03>PRT03</OPTION> <OPTION title=PRT15 value=PRT15>PRT15</OPTION> <OPTION title=PSJ12 value=PSJ12>PSJ12</OPTION> <OPTION title=PRT10 value=PRT10>PRT10</OPTION> <OPTION title=PSA11 value=PSA11>PSA11</OPTION> <OPTION title=12456 value=12456>12456</OPTION> <OPTION title=PSL01 value=PSL01>PSL01</OPTION> <OPTION title=PRUEBA value=PRUEBA>PRUEBA</OPTION> <OPTION title=PSJ99 value=PSJ99>PSJ99</OPTION> <OPTION title=PSJ999 value=PSJ999>PSJ999</OPTION> <OPTION title=PSJ01-HP value=PSJ01-HP>PSJ01-HP</OPTION> <OPTION title="Genera archivos PDF en una carpeta del servidor. " value=PDF>PDF</OPTION></SELECT></TD></TR></TBODY></TABLE></CENTER></DIV><!-------------------------------------------------------------------------------------------------------------------------------->
+<DIV id=div_barra_progreso style="HEIGHT: 100px; WIDTH: 520px; POSITION: relative; LEFT: 15px; Z-INDEX: 1">
+<CENTER><BR>
+<TABLE class=tabla style="FONT-SIZE: xx-small; WIDTH: 500px" width=500 border=0>
+<TBODY>
+<TR>
+<TD id=td_procesado bgColor=#003a75 height=20></TD>
+<TD id=td_restante bgColor=#efefef width=500></TD></TR></TBODY></TABLE>
+<TABLE style="FONT-SIZE: xx-small; WIDTH: 500px" width=500 border=0>
+<TBODY>
+<TR>
+<TD class=datos height=25 colSpan=2 align=left>
+<TABLE cellSpacing=0 cellPadding=0>
+<TBODY>
+<TR>
+<TD class=datos style="WIDTH: 470px" vAlign=middle>Comprobantes Procesados: <SPAN id=porcentajeprocesado>0</SPAN></TD>
+<TD vAlign=middle><IMG id=imgTrabajando style="DISPLAY: none" alt="" src="../images/sincronizar.gif"></TD></TR></TBODY></TABLE></TD></TR>
+<TR>
+<TD class=datos height=20 colSpan=2 align=center><INPUT onclick=ComenzarProceso(); id=btComenzar class=boton1 style="WIDTH: 130px" type=button value=Imprimir><INPUT onclick=DetenerProceso(); id=btDetener class=boton1 style="WIDTH: 130px; DISPLAY: none" type=button value=Detener></TD></TR></TBODY></TABLE></CENTER></DIV><BR>
+<DIV id=pie class=directorio style="OVERFLOW: hidden; HEIGHT: 25px; WIDTH: 550px; POSITION: relative" name="pie"></DIV>
+<SCRIPT>
+            setTimeout("Inicio()",50)
+        </SCRIPT>
+</BODY></HTML>
