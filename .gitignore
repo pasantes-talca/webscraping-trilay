@@ -1,0 +1,34 @@
+# Credenciales
+.env
+
+# Entorno virtual Python
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+*.log
+iedriver.log
+
+# Archivos generados durante las pruebas
+ventas_html.txt
+ventas_iframe_html.txt
+facturas_atomo_encontradas.txt
+
+# Descargas de facturas
+downloads/
+
+# Archivos temporales
+*.tmp
+
+# VS Code
+.vscode/
+
+# Sistema
+.DS_Store
+Thumbs.db
