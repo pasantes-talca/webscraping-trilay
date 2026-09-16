@@ -1,6 +1,8 @@
 from pathlib import Path
+from datetime import datetime
 import os
 import time
+import shutil
 
 from dotenv import load_dotenv
 
@@ -38,13 +40,30 @@ TRILAY_URL = (
 # FILTRO
 # =========================================================
 
-# ACÁ INDICÁS EL RANGO DE FECHAS
-# QUE QUERÉS DESCARGAR
+# Usa automáticamente la fecha actual de la PC
+# tanto en DESDE como en HASTA.
 
-FECHA_DESDE = "15/09/2026"
-FECHA_HASTA = "16/09/2026"
+FECHA_DESDE = datetime.now().strftime("%d/%m/%Y")
+FECHA_HASTA = datetime.now().strftime("%d/%m/%Y")
 
 CLIENTE = "atomo"
+
+
+# =========================================================
+# CARPETA DE FACTURAS
+# =========================================================
+
+# Trilay genera los PDF inicialmente en esta carpeta de red.
+CARPETA_FACTURAS = Path(r"\\192.168.10.3\Facturas Jumbo")
+
+# Ejemplo: 16-09-2026
+# Se usan guiones porque Windows no permite / en nombres de carpetas.
+NOMBRE_CARPETA_HOY = datetime.now().strftime("%d-%m-%Y")
+
+CARPETA_FACTURAS_HOY = (
+    CARPETA_FACTURAS
+    / NOMBRE_CARPETA_HOY
+)
 
 
 # =========================================================
@@ -1866,7 +1885,50 @@ try:
 
 
     # =====================================================
-    # 18. HACER CLIC EN IMPRIMIR
+    # 18. REGISTRAR PDF EXISTENTES ANTES DE IMPRIMIR
+    # =====================================================
+
+    print()
+    print(
+        "Registrando los PDF que ya existen "
+        "en la carpeta de red..."
+    )
+
+    if not CARPETA_FACTURAS.exists():
+
+        raise Exception(
+            "No se puede acceder a la carpeta de red: "
+            f"{CARPETA_FACTURAS}"
+        )
+
+
+    pdf_antes = {}
+
+    for archivo in CARPETA_FACTURAS.glob(
+        "*.pdf"
+    ):
+
+        try:
+
+            datos = archivo.stat()
+
+            pdf_antes[archivo.name] = (
+                datos.st_mtime_ns,
+                datos.st_size
+            )
+
+        except Exception:
+            pass
+
+
+    print(
+        "PDF existentes antes de imprimir:",
+        len(pdf_antes)
+    )
+
+
+    # =====================================================
+    # 19. HACER CLIC EN IMPRIMIR
     # =====================================================
 
     resultado_imprimir = (
@@ -1938,7 +2000,7 @@ try:
 
 
     # =====================================================
-    # 19. ESPERAR PROCESAMIENTO
+    # 20. ESPERAR PROCESAMIENTO
     # =====================================================
 
     print()
@@ -2001,7 +2063,239 @@ try:
 
 
     # =====================================================
-    # 20. RESUMEN FINAL
+    # 21. CREAR CARPETA DEL DÍA Y MOVER LOS PDF GENERADOS
+    # =====================================================
+
+    print()
+    print("==========================================")
+    print(" ORGANIZANDO FACTURAS")
+    print("==========================================")
+    print()
+
+    CARPETA_FACTURAS_HOY.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    print(
+        "Carpeta del día:",
+        CARPETA_FACTURAS_HOY
+    )
+
+    print()
+    print(
+        "Esperando que los PDF generados aparezcan "
+        "en la carpeta de red..."
+    )
+
+
+    def buscar_pdfs_generados():
+
+        encontrados = []
+
+        for archivo in CARPETA_FACTURAS.glob(
+            "*.pdf"
+        ):
+
+            try:
+
+                datos = archivo.stat()
+
+                estado_anterior = pdf_antes.get(
+                    archivo.name
+                )
+
+                estado_actual = (
+                    datos.st_mtime_ns,
+                    datos.st_size
+                )
+
+                # Es nuevo o fue regenerado/modificado
+                # durante esta ejecución.
+                if (
+                    estado_anterior is None
+                    or estado_actual != estado_anterior
+                ):
+
+                    encontrados.append(
+                        archivo
+                    )
+
+            except Exception:
+                pass
+
+        return encontrados
+
+
+    # Damos hasta 90 segundos para que la carpeta de red
+    # refleje todos los PDF generados por Trilay.
+    limite_espera = time.time() + 90
+
+    pdf_generados = []
+
+    while time.time() < limite_espera:
+
+        pdf_generados = buscar_pdfs_generados()
+
+        print(
+            "PDF detectados:",
+            len(pdf_generados),
+            "de",
+            len(codigos_facturas)
+        )
+
+        if (
+            len(pdf_generados)
+            >= len(codigos_facturas)
+        ):
+            break
+
+        time.sleep(2)
+
+
+    if not pdf_generados:
+
+        raise Exception(
+            "Trilay terminó la impresión, pero no se "
+            "detectaron PDF nuevos o modificados en "
+            f"{CARPETA_FACTURAS}"
+        )
+
+
+    # Esperar a que cada PDF termine de escribirse.
+    # Comparamos el tamaño dos veces antes de moverlo.
+    print()
+    print(
+        "Verificando que los PDF hayan terminado "
+        "de escribirse..."
+    )
+
+    pdf_estables = []
+
+    for pdf in pdf_generados:
+
+        estable = False
+
+        for intento in range(10):
+
+            try:
+
+                tamano_1 = pdf.stat().st_size
+
+                time.sleep(1)
+
+                tamano_2 = pdf.stat().st_size
+
+                if (
+                    tamano_1 > 0
+                    and tamano_1 == tamano_2
+                ):
+
+                    estable = True
+                    break
+
+            except Exception:
+                pass
+
+        if estable:
+
+            pdf_estables.append(
+                pdf
+            )
+
+        else:
+
+            print(
+                "No se pudo confirmar que terminó de "
+                "escribirse:",
+                pdf.name
+            )
+
+
+    print()
+    print(
+        "PDF listos para mover:",
+        len(pdf_estables)
+    )
+
+
+    pdf_movidos = 0
+    pdf_reemplazados = 0
+    errores_moviendo = 0
+
+    for pdf in pdf_estables:
+
+        destino = (
+            CARPETA_FACTURAS_HOY
+            / pdf.name
+        )
+
+        try:
+
+            # Si el proceso se ejecutó nuevamente el mismo día
+            # y el archivo ya existe, conservamos una sola copia:
+            # reemplazamos la anterior por la recién generada.
+            if destino.exists():
+
+                destino.unlink()
+
+                pdf_reemplazados += 1
+
+            shutil.move(
+                str(pdf),
+                str(destino)
+            )
+
+            print(
+                "Movido:",
+                pdf.name
+            )
+
+            pdf_movidos += 1
+
+        except Exception as error_archivo:
+
+            errores_moviendo += 1
+
+            print(
+                "No se pudo mover:",
+                pdf.name
+            )
+
+            print(
+                error_archivo
+            )
+
+
+    print()
+    print("==========================================")
+    print(" FACTURAS ORGANIZADAS")
+    print("==========================================")
+    print()
+
+    print(
+        "Carpeta:",
+        CARPETA_FACTURAS_HOY
+    )
+
+    print(
+        "PDF movidos:",
+        pdf_movidos
+    )
+
+    print(
+        "PDF reemplazados por una versión nueva:",
+        pdf_reemplazados
+    )
+
+    print(
+        "Errores al mover:",
+        errores_moviendo
+    )
+
+
+    # =====================================================
+    # 22. RESUMEN FINAL
     # =====================================================
 
     print()
