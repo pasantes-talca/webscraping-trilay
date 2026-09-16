@@ -38,11 +38,11 @@ TRILAY_URL = (
 # FILTRO
 # =========================================================
 
-# Por ahora estamos probando con esta fecha.
-# Más adelante podemos hacer que use automáticamente
-# la fecha actual o que la pases por consola.
+# ACÁ INDICÁS EL RANGO DE FECHAS
+# QUE QUERÉS DESCARGAR
 
-FECHA_BUSQUEDA = "10/09/2026"
+FECHA_DESDE = "15/09/2026"
+FECHA_HASTA = "16/09/2026"
 
 CLIENTE = "atomo"
 
@@ -86,9 +86,10 @@ options.edge_executable_path = (
 
 options.page_load_strategy = "none"
 
-# Importante:
-# iniciar directamente en Trilay evita el problema
-# que tuvimos con Protected Mode.
+# IMPORTANTE:
+# Iniciar directamente en Trilay evita
+# el problema con Protected Mode.
+
 options.initial_browser_url = (
     TRILAY_URL
 )
@@ -120,8 +121,13 @@ try:
     print()
 
     print(
-        "Fecha:",
-        FECHA_BUSQUEDA
+        "Desde:",
+        FECHA_DESDE
+    )
+
+    print(
+        "Hasta:",
+        FECHA_HASTA
     )
 
     print(
@@ -353,7 +359,7 @@ try:
 
 
     # =====================================================
-    # 5. LOCALIZAR LOS CAMPOS REALES
+    # 5. LOCALIZAR CAMPOS DE FECHA Y CLIENTE
     # =====================================================
 
     print()
@@ -364,11 +370,9 @@ try:
 
     resultado_campos = driver.execute_script(
         """
-        var fechaDeseada =
-            arguments[0];
-
-        var clienteDeseado =
-            arguments[1];
+        var fechaDesdeDeseada = arguments[0];
+        var fechaHastaDeseada = arguments[1];
+        var clienteDeseado = arguments[2];
 
 
         var inputs =
@@ -377,8 +381,7 @@ try:
             );
 
 
-        var visibles =
-            [];
+        var visibles = [];
 
 
         for (
@@ -435,17 +438,14 @@ try:
 
 
         // =========================================
-        // BUSCAR EL CAMPO DEL CLIENTE
+        // BUSCAR CAMPO CLIENTE
         // =========================================
 
-        var buscador =
-            null;
+        var buscador = null;
 
-        var infoBuscador =
-            null;
+        var infoBuscador = null;
 
-        var mayorX =
-            -999999;
+        var mayorX = -999999;
 
 
         for (
@@ -496,12 +496,10 @@ try:
 
 
         // =========================================
-        // BUSCAR FECHAS A LA IZQUIERDA
-        // DEL CAMPO CLIENTE
+        // BUSCAR LAS DOS FECHAS
         // =========================================
 
-        var candidatasFecha =
-            [];
+        var candidatasFecha = [];
 
 
         for (
@@ -571,9 +569,6 @@ try:
         }
 
 
-        // Las ordenamos desde la más cercana
-        // al buscador hacia la izquierda.
-
         candidatasFecha.sort(
             function(a, b) {
                 return b.x - a.x;
@@ -635,13 +630,13 @@ try:
 
         asignarFecha(
             fechaDesde,
-            fechaDeseada
+            fechaDesdeDeseada
         );
 
 
         asignarFecha(
             fechaHasta,
-            fechaDeseada
+            fechaHastaDeseada
         );
 
 
@@ -667,7 +662,6 @@ try:
         } catch(e) {}
 
 
-        // Guardamos las referencias.
         window._trilayFechaDesde =
             fechaDesde;
 
@@ -693,7 +687,8 @@ try:
                 buscador.value
         };
         """,
-        FECHA_BUSQUEDA,
+        FECHA_DESDE,
+        FECHA_HASTA,
         CLIENTE
     )
 
@@ -717,6 +712,7 @@ try:
         "Campos modificados:"
     )
 
+
     print(
         "DESDE:",
         resultado_campos[
@@ -724,12 +720,14 @@ try:
         ]
     )
 
+
     print(
         "HASTA:",
         resultado_campos[
             "fechaHasta"
         ]
     )
+
 
     print(
         "CLIENTE:",
@@ -743,7 +741,7 @@ try:
 
 
     # =====================================================
-    # 6. VERIFICAR VISUALMENTE LOS FILTROS
+    # 6. VERIFICAR FILTROS
     # =====================================================
 
     print()
@@ -814,12 +812,14 @@ try:
         ]
     )
 
+
     print(
         "VALOR VISUAL HASTA:",
         verificacion_campos[
             "hasta"
         ]
     )
+
 
     print(
         "VALOR VISUAL CLIENTE:",
@@ -833,7 +833,7 @@ try:
         verificacion_campos[
             "desde"
         ]
-        != FECHA_BUSQUEDA
+        != FECHA_DESDE
     ):
 
         raise Exception(
@@ -846,7 +846,7 @@ try:
         verificacion_campos[
             "hasta"
         ]
-        != FECHA_BUSQUEDA
+        != FECHA_HASTA
     ):
 
         raise Exception(
@@ -874,15 +874,18 @@ try:
     print("==========================================")
     print()
 
+
     print(
         "DESDE:",
-        FECHA_BUSQUEDA
+        FECHA_DESDE
     )
+
 
     print(
         "HASTA:",
-        FECHA_BUSQUEDA
+        FECHA_HASTA
     )
+
 
     print(
         "CLIENTE:",
@@ -891,7 +894,7 @@ try:
 
 
     # =====================================================
-    # 7. EJECUTAR BÚSQUEDA REAL
+    # 7. EJECUTAR BÚSQUEDA
     # =====================================================
 
     print()
@@ -957,11 +960,12 @@ try:
         "Esperando resultados..."
     )
 
+
     time.sleep(8)
 
 
     # =====================================================
-    # 8. BUSCAR EL LISTADO FILTRADO
+    # 8. BUSCAR LISTADO FILTRADO
     # =====================================================
 
     print()
@@ -970,13 +974,9 @@ try:
     )
 
 
-    listado_encontrado = (
-        False
-    )
+    listado_encontrado = False
 
-    cantidad_facturas = (
-        0
-    )
+    cantidad_facturas = 0
 
 
     try:
@@ -997,16 +997,12 @@ try:
             cantidad_facturas > 0
         ):
 
-            listado_encontrado = (
-                True
-            )
+            listado_encontrado = True
+
 
     except Exception:
         pass
 
-
-    # Si no está en el documento actual,
-    # buscar dentro de iframes internos.
 
     if not listado_encontrado:
 
@@ -1047,9 +1043,7 @@ try:
                         cantidad_temporal
                     )
 
-                    listado_encontrado = (
-                        True
-                    )
+                    listado_encontrado = True
 
                     break
 
@@ -1060,6 +1054,7 @@ try:
             except Exception:
 
                 try:
+
                     driver.switch_to.parent_frame()
 
                 except Exception:
@@ -1081,7 +1076,7 @@ try:
 
 
     # =====================================================
-    # 9. VERIFICAR FACTURAS RESULTANTES
+    # 9. VERIFICAR FACTURAS DEL RANGO
     # =====================================================
 
     print()
@@ -1094,12 +1089,76 @@ try:
     verificacion_resultados = (
         driver.execute_script(
             """
-            var fechaEsperada =
+            var fechaDesdeTexto =
                 arguments[0];
 
+            var fechaHastaTexto =
+                arguments[1];
+
             var clienteEsperado =
-                arguments[1]
+                arguments[2]
                 .toUpperCase();
+
+
+            function convertirFecha(
+                texto
+            ) {
+
+                if (!texto) {
+                    return null;
+                }
+
+
+                var partes =
+                    texto.split('/');
+
+
+                if (
+                    partes.length != 3
+                ) {
+                    return null;
+                }
+
+
+                var dia =
+                    parseInt(
+                        partes[0],
+                        10
+                    );
+
+
+                var mes =
+                    parseInt(
+                        partes[1],
+                        10
+                    );
+
+
+                var anio =
+                    parseInt(
+                        partes[2],
+                        10
+                    );
+
+
+                return new Date(
+                    anio,
+                    mes - 1,
+                    dia
+                );
+            }
+
+
+            var fechaDesde =
+                convertirFecha(
+                    fechaDesdeTexto
+                );
+
+
+            var fechaHasta =
+                convertirFecha(
+                    fechaHastaTexto
+                );
 
 
             var checks =
@@ -1108,11 +1167,9 @@ try:
                 );
 
 
-            var correctas =
-                0;
+            var correctas = 0;
 
-            var incorrectas =
-                0;
+            var incorrectas = 0;
 
 
             for (
@@ -1125,10 +1182,16 @@ try:
                     checks[i];
 
 
-                var fecha =
+                var fechaTexto =
                     check.getAttribute(
                         'artfechacomprobante'
                     ) || '';
+
+
+                var fechaFactura =
+                    convertirFecha(
+                        fechaTexto
+                    );
 
 
                 var fila =
@@ -1145,8 +1208,7 @@ try:
                 }
 
 
-                var textoFila =
-                    '';
+                var textoFila = '';
 
 
                 if (fila) {
@@ -1160,9 +1222,20 @@ try:
                 }
 
 
-                var fechaOK =
-                    fecha
-                    == fechaEsperada;
+                var fechaOK = false;
+
+
+                if (
+                    fechaFactura &&
+                    fechaDesde &&
+                    fechaHasta
+                ) {
+
+                    fechaOK =
+                        fechaFactura >= fechaDesde
+                        &&
+                        fechaFactura <= fechaHasta;
+                }
 
 
                 var clienteOK =
@@ -1197,8 +1270,9 @@ try:
                     incorrectas
             };
             """,
-            FECHA_BUSQUEDA,
-            "ATOMO"
+            FECHA_DESDE,
+            FECHA_HASTA,
+            CLIENTE
         )
     )
 
@@ -1211,12 +1285,14 @@ try:
         ]
     )
 
+
     print(
         "CORRECTAS:",
         verificacion_resultados[
             "correctas"
         ]
     )
+
 
     print(
         "INCORRECTAS:",
@@ -1247,7 +1323,7 @@ try:
 
         raise Exception(
             "El filtro devolvió facturas "
-            "incorrectas. "
+            "fuera del rango o de otro cliente. "
             "Se cancela la impresión."
         )
 
@@ -1258,11 +1334,23 @@ try:
     print("==========================================")
     print()
 
+
     print(
-        "Todas las facturas son de "
-        "ATOMO y del",
-        FECHA_BUSQUEDA
+        "Todas las facturas son de ATOMO"
     )
+
+
+    print(
+        "y están dentro del rango:"
+    )
+
+
+    print(
+        FECHA_DESDE,
+        "hasta",
+        FECHA_HASTA
+    )
+
 
     print()
     print(
@@ -1335,8 +1423,7 @@ try:
                     'chkborrar'
                 );
 
-            var cantidad =
-                0;
+            var cantidad = 0;
 
 
             for (
@@ -1390,7 +1477,7 @@ try:
 
 
     # =====================================================
-    # 11. OBTENER CÓDIGOS DE FACTURA
+    # 11. OBTENER CÓDIGOS
     # =====================================================
 
     print()
@@ -1408,8 +1495,7 @@ try:
                 );
 
 
-            var codigos =
-                [];
+            var codigos = [];
 
 
             for (
@@ -1462,7 +1548,7 @@ try:
 
 
     # =====================================================
-    # 12. ABRIR IMPRESIÓN MÚLTIPLE DIRECTAMENTE
+    # 12. ABRIR IMPRESIÓN MÚLTIPLE
     # =====================================================
 
     print()
@@ -1820,20 +1906,30 @@ try:
     print("==========================================")
     print()
 
+
     print(
-        "Fecha:",
-        FECHA_BUSQUEDA
+        "Desde:",
+        FECHA_DESDE
     )
+
+
+    print(
+        "Hasta:",
+        FECHA_HASTA
+    )
+
 
     print(
         "Cliente:",
         CLIENTE.upper()
     )
 
+
     print(
         "Facturas:",
         len(codigos_facturas)
     )
+
 
     print(
         "Impresora:",
@@ -1842,7 +1938,7 @@ try:
 
 
     # =====================================================
-    # 19. ESPERAR PROCESAMIENTO DE TODAS LAS FACTURAS
+    # 19. ESPERAR PROCESAMIENTO
     # =====================================================
 
     print()
@@ -1896,8 +1992,6 @@ try:
 
     except Exception:
 
-        # Esto NO lo tomamos como error general porque
-        # la impresión ya fue iniciada.
         print()
         print(
             "La impresión fue iniciada, "
@@ -1916,20 +2010,30 @@ try:
     print("==========================================")
     print()
 
+
     print(
-        "Fecha:",
-        FECHA_BUSQUEDA
+        "Desde:",
+        FECHA_DESDE
     )
+
+
+    print(
+        "Hasta:",
+        FECHA_HASTA
+    )
+
 
     print(
         "Cliente:",
         CLIENTE.upper()
     )
 
+
     print(
         "Facturas enviadas a PDF:",
         len(codigos_facturas)
     )
+
 
     print()
     print(
@@ -1960,7 +2064,7 @@ except Exception as error:
 
 
 # =========================================================
-# MANTENER EL NAVEGADOR ABIERTO
+# MANTENER NAVEGADOR ABIERTO
 # =========================================================
 
 input(
