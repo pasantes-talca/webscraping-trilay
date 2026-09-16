@@ -1,9 +1,0 @@
-<HTML><HEAD></HEAD>
-<BODY>
-<SCRIPT>
-               
-                Pagina="ImprimirMultiplesFacturas.asp?accion=INICIO&CodJerarquia=7&codi=2343852|2343863|2343864|2343857|2343846|2343845|2343865|2343859|2343862|2343847|2343844|2343858|2343855|2343861|2343860";
-                vuelta = window.showModalDialog(Pagina,'', 'help:no;status:no;dialogHeight:230px;dialogWidth:550px;');    
-                
-            </SCRIPT>
-</BODY></HTML>
