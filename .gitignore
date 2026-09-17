@@ -1,34 +1,23 @@
-# Credenciales
 .env
 
-# Entorno virtual Python
 .venv/
 venv/
-
-# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-
-# Logs
 *.log
-iedriver.log
 
-# Archivos generados durante las pruebas
-ventas_html.txt
-ventas_iframe_html.txt
-facturas_atomo_encontradas.txt
+*.xlsx
+*.pdf
+*.json
 
-# Descargas de facturas
 downloads/
 
-# Archivos temporales
-*.tmp
+facturas_pendientes/
+facturas_procesadas/
+facturas_error/
+facturas_cambio/
 
-# VS Code
 .vscode/
 
-# Sistema
-.DS_Store
-Thumbs.db
+*.xlsx
+!data/Mapeo_Sucursales_Completo.xlsx

@@ -7,7 +7,6 @@ from config import (
 
 from trilay.navegador import crear_driver
 from trilay.login import iniciar_sesion
-
 from trilay.ventas import (
     seleccionar_sucursal,
     abrir_ventas,
@@ -16,21 +15,29 @@ from trilay.ventas import (
     seleccionar_facturas,
 )
 
-from trilay.impresion import imprimir_facturas_pdf
+from trilay.impresion import (
+    imprimir_facturas_pdf,
+)
 
 from archivos.facturas import (
     registrar_pdfs_existentes,
     organizar_pdfs_generados,
 )
 
+from krikos.proceso import (
+    procesar_lote_krikos,
+)
 
-def main():
+from krikos.registro import (
+    registrar_ejecucion,
+)
+
+
+def ejecutar_trilay():
 
     driver = None
 
     try:
-
-        print("Iniciando automatización Trilay...")
 
         driver = crear_driver()
 
@@ -40,7 +47,7 @@ def main():
 
         seleccionar_sucursal(
             driver,
-            SUCURSAL
+            SUCURSAL,
         )
 
         abrir_ventas(
@@ -61,22 +68,27 @@ def main():
             cliente=CLIENTE,
         )
 
+
         if not facturas:
 
             print(
-                "No se encontraron facturas."
+                "No se encontraron facturas "
+                "en Trilay."
             )
 
-            return
+            return []
+
 
         seleccionar_facturas(
             driver,
-            facturas
+            facturas,
         )
+
 
         pdf_anteriores = (
             registrar_pdfs_existentes()
         )
+
 
         imprimir_facturas_pdf(
             driver=driver,
@@ -84,25 +96,28 @@ def main():
             sucursal=SUCURSAL,
         )
 
+
         archivos_movidos = (
             organizar_pdfs_generados(
-                pdf_anteriores=pdf_anteriores,
-                cantidad_esperada=len(facturas),
+                pdf_anteriores=
+                    pdf_anteriores,
+
+                cantidad_esperada=
+                    len(facturas),
             )
         )
 
-        print(
-            f"Proceso completado. "
-            f"Facturas procesadas: {len(facturas)}. "
-            f"PDF organizados: {len(archivos_movidos)}."
-        )
-
-    except Exception as error:
 
         print(
-            f"Error durante la automatización: "
-            f"{type(error).__name__}: {error}"
+            f"Trilay finalizado. "
+            f"Facturas: {len(facturas)}. "
+            f"PDF organizados: "
+            f"{len(archivos_movidos)}."
         )
+
+
+        return archivos_movidos
+
 
     finally:
 
@@ -113,8 +128,78 @@ def main():
                 driver.quit()
 
             except Exception:
-
                 pass
+
+
+def main():
+
+    with registrar_ejecucion():
+
+        try:
+
+            print(
+                "\nIniciando Trilay..."
+            )
+
+
+            archivos_generados = (
+                ejecutar_trilay()
+            )
+
+
+            if not archivos_generados:
+
+                print(
+                    "No hay facturas nuevas "
+                    "para enviar a Krikos."
+                )
+
+                return
+
+
+            print(
+                "\nIniciando Krikos..."
+            )
+
+
+            resultado_krikos = (
+                procesar_lote_krikos()
+            )
+
+
+            print(
+                "\nProceso completo finalizado."
+            )
+
+
+            print(
+                f"Enviadas a Krikos: "
+                f"{resultado_krikos['enviadas']}"
+            )
+
+
+            print(
+                f"Sin enviar: "
+                f"{resultado_krikos['sin_enviar']}"
+            )
+
+
+            print(
+                f"Errores: "
+                f"{resultado_krikos['errores']}"
+            )
+
+
+        except Exception as error:
+
+            print(
+                "\nERROR GENERAL:"
+            )
+
+            print(
+                f"{type(error).__name__}: "
+                f"{error}"
+            )
 
 
 if __name__ == "__main__":
