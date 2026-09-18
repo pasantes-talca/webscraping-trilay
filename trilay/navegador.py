@@ -14,6 +14,8 @@ def crear_driver():
 
     options.attach_to_edge_chrome = True
 
+    options.ignore_protected_mode_settings = True
+
     options.page_load_strategy = "none"
 
     options.initial_browser_url = TRILAY_URL
