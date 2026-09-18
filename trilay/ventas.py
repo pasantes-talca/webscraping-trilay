@@ -827,10 +827,39 @@ def seleccionar_facturas(
                     checks[i];
 
 
+                var codigoEncontrado =
+                    false;
+
+
+                /*
+                 * Trilay se ejecuta con el motor de
+                 * Internet Explorer. En sus modos de
+                 * documento antiguos Array#indexOf no
+                 * esta disponible, por eso buscamos el
+                 * codigo con un bucle compatible.
+                 */
+                for (
+                    var j = 0;
+                    j < codigos.length;
+                    j++
+                ) {
+
+                    if (
+                        String(codigos[j])
+                        ==
+                        String(check.value)
+                    ) {
+
+                        codigoEncontrado =
+                            true;
+
+                        break;
+                    }
+                }
+
+
                 check.checked =
-                    codigos.indexOf(
-                        check.value
-                    ) >= 0;
+                    codigoEncontrado;
 
 
                 if (

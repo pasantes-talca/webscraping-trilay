@@ -13,7 +13,11 @@ __pycache__/
 
 # Logs
 *.log
+logs/
 iedriver.log
+
+# Sesion autenticada de Krikos (puede contener credenciales temporales)
+data/estado_sesion.json
 
 # Archivos generados durante las pruebas
 ventas_html.txt
@@ -32,3 +36,6 @@ downloads/
 # Sistema
 .DS_Store
 Thumbs.db
+tests/
+data/
+*.md

@@ -1,6 +1,5 @@
 import time
 import shutil
-from datetime import datetime
 from pathlib import Path
 
 from config import CARPETA_FACTURAS
@@ -34,21 +33,16 @@ def registrar_pdfs_existentes():
 def organizar_pdfs_generados(
     pdf_anteriores,
     cantidad_esperada,
+    fecha_carpeta,
 ):
 
     # ==========================================
     # CREAR CARPETA DEL DÍA
     # ==========================================
 
-    nombre_carpeta = (
-        datetime.now().strftime(
-            "%d-%m-%Y"
-        )
-    )
-
     carpeta_destino = (
         CARPETA_FACTURAS
-        / nombre_carpeta
+        / fecha_carpeta
     )
 
     carpeta_destino.mkdir(
