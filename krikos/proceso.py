@@ -475,7 +475,21 @@ def cargar_facturas_krikos(
 # PROCESO COMPLETO KRIKOS
 # ==========================================
 
-def procesar_lote_krikos():
+def procesar_lote_krikos(fecha_carpeta=None):
+
+    fecha_proceso = (
+        datetime.strptime(
+            fecha_carpeta,
+            "%d-%m-%Y",
+        )
+        if fecha_carpeta
+        else datetime.now()
+    )
+
+    print(
+        "Fecha de proceso recibida por Krikos: "
+        f"{fecha_proceso:%d-%m-%Y}"
+    )
 
     # ======================================
     # CONECTAR AL SERVIDOR
@@ -492,7 +506,8 @@ def procesar_lote_krikos():
 
     carpeta_dia = (
         carpeta_del_dia(
-            raiz_servidor
+            raiz_servidor,
+            fecha_proceso,
         )
     )
 

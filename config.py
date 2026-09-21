@@ -80,21 +80,32 @@ CARPETA_FACTURAS = Path(
 # KRIKOS
 # ==========================================
 
-# Se puede cambiar sin tocar el codigo agregando
-# KRIKOS_PROYECTO=<ruta> al archivo .env.
-KRIKOS_PROYECTO = Path(
-    os.getenv(
-        "KRIKOS_PROYECTO",
-        str(BASE_DIR.parent / "webscrapping"),
-    )
-)
-
 KRIKOS_DATA_DIR = Path(
     os.getenv(
         "KRIKOS_DATA_DIR",
         str(BASE_DIR / "data"),
     )
 )
+
+KRIKOS_EMAIL = os.getenv("KRIKOS_EMAIL", os.getenv("EMAIL"))
+KRIKOS_PASSWORD = os.getenv("KRIKOS_PASSWORD", os.getenv("PASSWORD"))
+KRIKOS_URL = os.getenv("KRIKOS_URL", os.getenv("URL"))
+
+SERVIDOR_USUARIO = os.getenv("SERVIDOR_USUARIO")
+SERVIDOR_PASSWORD = os.getenv("SERVIDOR_PASSWORD")
+
+CARPETA_DATA = KRIKOS_DATA_DIR
+ARCHIVO_ESTADO_SESION = CARPETA_DATA / "estado_sesion.json"
+ARCHIVO_MAPEO_SUCURSALES = (
+    CARPETA_DATA / "Mapeo_Sucursales_Completo.xlsx"
+)
+
+IMPUESTO_BEBIDAS = 0.087
+IMPUESTO_LIMA = 0.0417
+IMPUESTO_SODA = 0.0
+
+ENVIAR_FACTURA_AUTOMATICAMENTE = True
+ESPERA_POST_ENVIO_MS = 1800
 
 
 # ==========================================
