@@ -4,7 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from utils.fechas import (
-    formatos_dia_anterior,
+    formatos_fecha_facturacion,
 )
 
 
@@ -47,7 +47,7 @@ LOG_PATH = (
 # FILTROS
 # ==========================================
 
-FECHA_DESDE, FECHA_CARPETA = formatos_dia_anterior()
+FECHA_DESDE, FECHA_CARPETA = formatos_fecha_facturacion()
 FECHA_HASTA = FECHA_DESDE
 
 CLIENTE = "atomo"

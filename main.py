@@ -1,6 +1,7 @@
+import sys
+
 from config import (
     FECHA_DESDE,
-    FECHA_HASTA,
     FECHA_CARPETA,
     CLIENTE,
     SUCURSAL,
@@ -27,16 +28,20 @@ from archivos.facturas import (
 from integraciones.krikos import cargar_facturas_en_krikos
 from integraciones.correo import enviar_log_por_correo
 from utils.registro import registrar_ejecucion
+from utils.fechas import formatos_fecha_facturacion
 
 
-def ejecutar_proceso():
+def ejecutar_proceso(
+    fecha_desde=FECHA_DESDE,
+    fecha_carpeta=FECHA_CARPETA,
+):
 
     driver = None
 
     try:
 
         print("Iniciando automatización Trilay...")
-        print(f"Fecha de proceso: {FECHA_DESDE}")
+        print(f"Fecha de proceso: {fecha_desde}")
 
         driver = crear_driver()
 
@@ -55,15 +60,15 @@ def ejecutar_proceso():
 
         aplicar_filtros(
             driver=driver,
-            fecha_desde=FECHA_DESDE,
-            fecha_hasta=FECHA_HASTA,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_desde,
             cliente=CLIENTE,
         )
 
         facturas = obtener_facturas(
             driver=driver,
-            fecha_desde=FECHA_DESDE,
-            fecha_hasta=FECHA_HASTA,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_desde,
             cliente=CLIENTE,
         )
 
@@ -94,7 +99,7 @@ def ejecutar_proceso():
             organizar_pdfs_generados(
                 pdf_anteriores=pdf_anteriores,
                 cantidad_esperada=len(facturas),
-                fecha_carpeta=FECHA_CARPETA,
+                fecha_carpeta=fecha_carpeta,
             )
         )
 
@@ -141,7 +146,7 @@ def ejecutar_proceso():
     # Krikos puede abrir su navegador y procesar la carpeta del dia.
     try:
 
-        cargar_facturas_en_krikos(FECHA_CARPETA)
+        cargar_facturas_en_krikos(fecha_carpeta)
 
     except Exception as error:
 
@@ -155,18 +160,29 @@ def ejecutar_proceso():
     return True
 
 
-def main():
+def main(fecha_facturacion=None):
     resultado_ok = False
     ruta_log = None
 
     try:
+        fecha_desde, fecha_carpeta = formatos_fecha_facturacion(
+            fecha_facturacion
+        )
+    except ValueError as error:
+        print(error)
+        return False
+
+    try:
         with registrar_ejecucion() as ruta_log:
-            resultado_ok = ejecutar_proceso()
+            resultado_ok = ejecutar_proceso(
+                fecha_desde=fecha_desde,
+                fecha_carpeta=fecha_carpeta,
+            )
     except BaseException:
         resultado_ok = False
 
     estado = "OK" if resultado_ok else "CON ERRORES"
-    asunto = f"Proceso Trilay/Krikos {FECHA_CARPETA}: {estado}"
+    asunto = f"Proceso Trilay/Krikos {fecha_carpeta}: {estado}"
 
     try:
         if ruta_log is None:
@@ -191,6 +207,22 @@ def main():
             f"{type(error).__name__}: {error}"
         )
 
+    return resultado_ok
+
+
+def ejecutar_desde_terminal(argumentos=None):
+    argumentos = list(sys.argv[1:] if argumentos is None else argumentos)
+
+    if len(argumentos) > 1:
+        print(
+            "Uso: python main.py [DD-MM-AAAA]\n"
+            "Ejemplo: python main.py 17-09-2026"
+        )
+        return False
+
+    fecha_facturacion = argumentos[0] if argumentos else None
+    return main(fecha_facturacion)
+
 
 if __name__ == "__main__":
-    main()
+    ejecutar_desde_terminal()
