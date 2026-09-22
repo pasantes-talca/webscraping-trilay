@@ -225,4 +225,4 @@ def ejecutar_desde_terminal(argumentos=None):
 
 
 if __name__ == "__main__":
-    ejecutar_desde_terminal()
+    sys.exit(0 if ejecutar_desde_terminal() else 1)
