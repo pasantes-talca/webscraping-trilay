@@ -5,6 +5,7 @@ from config import (
     IEDRIVER_PATH,
     LOG_PATH,
     TRILAY_URL,
+    EDGE_PATH,
 )
 
 
@@ -20,6 +21,7 @@ def crear_driver():
 
     options.initial_browser_url = TRILAY_URL
 
+    options.edge_executable_path = EDGE_PATH
 
     service = Service(
         executable_path=str(IEDRIVER_PATH),
