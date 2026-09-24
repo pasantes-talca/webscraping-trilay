@@ -250,6 +250,7 @@ def importar_pdf(
     importados = 0
     omitidos = 0
     errores = 0
+    errores_detalle = []
 
 
     # ==========================================
@@ -385,9 +386,13 @@ def importar_pdf(
         except (
             OSError,
             RuntimeError,
-        ):
+        ) as error:
 
             errores += 1
+            errores_detalle.append({
+                "archivo": pdf.name,
+                "motivo": f"No se pudo copiar desde el servidor: {error}",
+            })
 
 
         finally:
@@ -413,4 +418,5 @@ def importar_pdf(
         "importados": importados,
         "omitidos": omitidos,
         "errores": errores,
+        "errores_detalle": errores_detalle,
     }

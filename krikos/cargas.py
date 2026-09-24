@@ -1297,10 +1297,7 @@ def cargar_gln_y_enviar(
         )
 
     except Exception:
-
-        # La siguiente factura va a volver
-        # a navegar al listado de todas formas.
-        pass
+        return "envio_sin_confirmar"
 
 
     return "enviada"

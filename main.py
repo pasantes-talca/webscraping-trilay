@@ -26,7 +26,7 @@ from archivos.facturas import (
 )
 
 from integraciones.krikos import cargar_facturas_en_krikos
-from integraciones.correo import enviar_log_por_correo
+from integraciones.correo import enviar_log_por_correo, formatear_reporte_correo
 from utils.registro import registrar_ejecucion
 from utils.fechas import formatos_fecha_facturacion
 
@@ -34,8 +34,13 @@ from utils.fechas import formatos_fecha_facturacion
 def ejecutar_proceso(
     fecha_desde=FECHA_DESDE,
     fecha_carpeta=FECHA_CARPETA,
+    reporte=None,
 ):
 
+    if reporte is None:
+        reporte = {}
+    facturas = []
+    archivos_movidos = []
     driver = None
 
     try:
@@ -78,6 +83,7 @@ def ejecutar_proceso(
                 "No se encontraron facturas."
             )
 
+            reporte["observacion"] = "Trilay no mostró facturas para la fecha y el cliente configurados."
             return True
 
         seleccionar_facturas(
@@ -102,6 +108,7 @@ def ejecutar_proceso(
                 fecha_carpeta=fecha_carpeta,
             )
         )
+        reporte["descargadas"] = [archivo.name for archivo in archivos_movidos]
 
 
         if len(archivos_movidos) != len(facturas):
@@ -127,6 +134,12 @@ def ejecutar_proceso(
             f"{type(error).__name__}: {error}"
         )
 
+        reporte["error_general"] = f"Falló la etapa de Trilay: {type(error).__name__}: {error}"
+        for factura in facturas:
+            reporte.setdefault("pendientes_detalle", []).append({
+                "archivo": str(factura.get("codigo", "Factura sin código")),
+                "motivo": "La descarga desde Trilay no terminó correctamente; no se intentó cargar en Krikos.",
+            })
         return False
 
     finally:
@@ -146,7 +159,12 @@ def ejecutar_proceso(
     # Krikos puede abrir su navegador y procesar la carpeta del dia.
     try:
 
-        cargar_facturas_en_krikos(fecha_carpeta)
+        resultado_krikos = cargar_facturas_en_krikos(fecha_carpeta)
+        if not isinstance(resultado_krikos, dict):
+            raise RuntimeError("Krikos no devolvió un resultado verificable.")
+        reporte.update(resultado_krikos)
+        return not (resultado_krikos.get("errores") or
+                    resultado_krikos.get("sin_enviar"))
 
     except Exception as error:
 
@@ -155,14 +173,19 @@ def ejecutar_proceso(
             f"{type(error).__name__}: {error}"
         )
 
+        reporte["error_general"] = f"Falló la etapa de Krikos: {type(error).__name__}: {error}"
+        for archivo in archivos_movidos:
+            reporte.setdefault("pendientes_detalle", []).append({
+                "archivo": archivo.name,
+                "motivo": "Krikos no pudo procesar el lote; se desconoce si esta factura fue cargada.",
+            })
         return False
-
-    return True
 
 
 def main(fecha_facturacion=None):
     resultado_ok = False
     ruta_log = None
+    reporte = {}
 
     try:
         fecha_desde, fecha_carpeta = formatos_fecha_facturacion(
@@ -177,9 +200,11 @@ def main(fecha_facturacion=None):
             resultado_ok = ejecutar_proceso(
                 fecha_desde=fecha_desde,
                 fecha_carpeta=fecha_carpeta,
+                reporte=reporte,
             )
-    except BaseException:
+    except BaseException as error:
         resultado_ok = False
+        reporte["error_general"] = f"Error inesperado: {type(error).__name__}: {error}"
 
     estado = "OK" if resultado_ok else "CON ERRORES"
     asunto = f"Proceso Trilay/Krikos {fecha_carpeta}: {estado}"
@@ -190,15 +215,9 @@ def main(fecha_facturacion=None):
 
         log_texto = ruta_log.read_text(encoding="utf-8")
 
-        # Extract the structured summary printed by webscrapping
-        MARCA_INI = "=== RESUMEN CORREO ==="
-        MARCA_FIN = "=== FIN RESUMEN CORREO ==="
-        idx_ini = log_texto.find(MARCA_INI)
-        idx_fin = log_texto.find(MARCA_FIN)
-        if idx_ini != -1 and idx_fin != -1:
-            cuerpo = log_texto[idx_ini + len(MARCA_INI):idx_fin].strip()
-        else:
-            cuerpo = log_texto
+        cuerpo = formatear_reporte_correo(
+            fecha_carpeta, resultado_ok, reporte, log_texto
+        )
         enviar_log_por_correo(asunto, cuerpo)
         print(f"Correo de resultado enviado: {asunto}")
     except Exception as error:
@@ -206,6 +225,7 @@ def main(fecha_facturacion=None):
             "No se pudo enviar el correo de resultado: "
             f"{type(error).__name__}: {error}"
         )
+        return False
 
     return resultado_ok
 

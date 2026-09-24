@@ -16,6 +16,7 @@ class SalidaConLog:
 
         for clave in (
             "TRILAY_PASSWORD",
+            "KRIKOS_PASSWORD",
             "PASSWORD",
             "SERVIDOR_PASSWORD",
             "SMTP_PASSWORD",

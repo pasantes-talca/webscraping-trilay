@@ -162,13 +162,28 @@ def mover_pdf(
     return destino
 
 
+def detalle_factura(ruta_pdf, datos=None, motivo=None):
+    datos = datos or {}
+    punto = str(datos.get("punto_venta") or "").strip()
+    numero = str(datos.get("numero_factura") or "").strip()
+    detalle = {"archivo": Path(ruta_pdf).name}
+    if numero:
+        detalle["numero"] = f"{punto}-{numero}" if punto else numero
+    if motivo:
+        detalle["motivo"] = str(motivo)
+    return detalle
+
+
 # ==========================================
 # PREPARAR FACTURAS
 # ==========================================
 
 def preparar_facturas(
     carpetas,
+    detalle=None,
 ):
+    if detalle is None:
+        detalle = {"errores": [], "omitidas": []}
 
     pendientes = (
         carpetas[
@@ -189,6 +204,7 @@ def preparar_facturas(
 
     for ruta_pdf in pdfs:
 
+        datos = None
         try:
 
             validar_pdf(
@@ -227,6 +243,10 @@ def preparar_facturas(
                     ],
                 )
 
+                detalle["omitidas"].append(detalle_factura(
+                    ruta_pdf, datos,
+                    "Factura de cambio: este proceso solo carga facturas generales.",
+                ))
                 continue
 
 
@@ -243,6 +263,10 @@ def preparar_facturas(
                     ],
                 )
 
+                detalle["errores"].append(detalle_factura(
+                    ruta_pdf, datos,
+                    f"Tipo de factura no reconocido: {tipo or 'sin identificar'}.",
+                ))
                 continue
 
 
@@ -275,17 +299,12 @@ def preparar_facturas(
             )
 
 
+            motivo = f"No se pudo preparar la factura: {error}"
             try:
-
-                mover_pdf(
-                    ruta_pdf,
-                    carpetas[
-                        "errores"
-                    ],
-                )
-
-            except Exception:
-                pass
+                mover_pdf(ruta_pdf, carpetas["errores"])
+            except Exception as error_movimiento:
+                motivo += f" Además, no se pudo mover el PDF: {error_movimiento}"
+            detalle["errores"].append(detalle_factura(ruta_pdf, datos, motivo))
 
 
     return facturas
@@ -306,6 +325,9 @@ def cargar_facturas_krikos(
             "enviadas": 0,
             "sin_enviar": 0,
             "errores": 0,
+            "exitosas_detalle": [],
+            "pendientes_detalle": [],
+            "errores_detalle": [],
         }
 
 
@@ -318,6 +340,10 @@ def cargar_facturas_krikos(
     enviadas = 0
     sin_enviar = 0
     errores = 0
+    exitosas_detalle = []
+    pendientes_detalle = []
+    errores_detalle = []
+    procesadas = set()
 
 
     try:
@@ -388,6 +414,8 @@ def cargar_facturas_krikos(
 
 
                     enviadas += 1
+                    exitosas_detalle.append(detalle_factura(ruta_pdf, datos))
+                    procesadas.add(ruta_pdf)
 
 
                 # ==========================
@@ -401,6 +429,19 @@ def cargar_facturas_krikos(
 
                     # La dejamos en pendientes.
                     sin_enviar += 1
+                    pendientes_detalle.append(detalle_factura(
+                        ruta_pdf, datos,
+                        "La factura se cargó en Krikos, pero el envío automático está desactivado.",
+                    ))
+                    procesadas.add(ruta_pdf)
+
+                elif estado == "envio_sin_confirmar":
+                    sin_enviar += 1
+                    pendientes_detalle.append(detalle_factura(
+                        ruta_pdf, datos,
+                        "Se pulsó Enviar factura, pero Krikos no mostró la pantalla de confirmación. Verificar en Krikos antes de reintentar para evitar duplicados.",
+                    ))
+                    procesadas.add(ruta_pdf)
 
 
                 # ==========================
@@ -408,7 +449,7 @@ def cargar_facturas_krikos(
                 # ==========================
 
                 else:
-
+                    motivo = f"Krikos devolvió un estado no reconocido: {estado!r}."
                     mover_pdf(
                         ruta_pdf,
                         carpetas[
@@ -418,6 +459,8 @@ def cargar_facturas_krikos(
 
 
                     errores += 1
+                    errores_detalle.append(detalle_factura(ruta_pdf, datos, motivo))
+                    procesadas.add(ruta_pdf)
 
 
             except Exception as error:
@@ -428,7 +471,7 @@ def cargar_facturas_krikos(
                     f"{error}"
                 )
 
-
+                motivo = f"No se pudo cargar o enviar en Krikos: {error}"
                 try:
 
                     mover_pdf(
@@ -438,12 +481,24 @@ def cargar_facturas_krikos(
                         ],
                     )
 
-                except Exception:
-                    pass
+                except Exception as error_movimiento:
+                    motivo += f" Además, no se pudo mover el PDF: {error_movimiento}"
 
 
                 errores += 1
+                errores_detalle.append(detalle_factura(ruta_pdf, datos, motivo))
+                procesadas.add(ruta_pdf)
 
+
+    except Exception as error:
+        for factura in facturas:
+            ruta_pdf = factura["ruta_pdf"]
+            if ruta_pdf not in procesadas:
+                pendientes_detalle.append(detalle_factura(
+                    ruta_pdf, factura["datos"],
+                    f"No se pudo iniciar o continuar Krikos: {error}",
+                ))
+                sin_enviar += 1
 
     finally:
 
@@ -468,6 +523,9 @@ def cargar_facturas_krikos(
 
         "errores":
             errores,
+        "exitosas_detalle": exitosas_detalle,
+        "pendientes_detalle": pendientes_detalle,
+        "errores_detalle": errores_detalle,
     }
 
 
@@ -579,11 +637,18 @@ def procesar_lote_krikos(fecha_carpeta=None):
     # EXTRAER Y VALIDAR
     # ======================================
 
-    facturas = (
-        preparar_facturas(
-            carpetas
-        )
+    detalle_preparacion = {"errores": [], "omitidas": []}
+    facturas = preparar_facturas(carpetas, detalle_preparacion)
+
+    resultado = cargar_facturas_krikos(facturas, carpetas)
+    resultado["errores_detalle"] = (
+        resultado_importacion.get("errores_detalle", [])
+        + detalle_preparacion["errores"]
+        + resultado["errores_detalle"]
     )
+    resultado["omitidas_detalle"] = detalle_preparacion["omitidas"]
+    resultado["errores"] = len(resultado["errores_detalle"])
+    resultado["sin_enviar"] = len(resultado["pendientes_detalle"])
 
 
     if not facturas:
@@ -594,24 +659,12 @@ def procesar_lote_krikos(fecha_carpeta=None):
         )
 
 
-        return {
-            "enviadas": 0,
-            "sin_enviar": 0,
-            "errores": 0,
-        }
+        return resultado
 
 
     # ======================================
     # CARGAR EN KRIKOS
     # ======================================
-
-    resultado = (
-        cargar_facturas_krikos(
-            facturas,
-            carpetas,
-        )
-    )
-
 
     print(
         "\nProceso Krikos finalizado."
