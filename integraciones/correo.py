@@ -16,29 +16,61 @@ from config import (
 def formatear_reporte_correo(fecha, resultado_ok, reporte, log_texto):
     """Construye un correo legible con el resultado de cada PDF del lote."""
     exitosas = reporte.get("exitosas_detalle", [])
+    ya_cargadas = reporte.get("ya_cargadas_detalle", [])
     errores = reporte.get("errores_detalle", [])
     pendientes = reporte.get("pendientes_detalle", [])
     omitidas = reporte.get("omitidas_detalle", [])
 
+    carpeta_origen = reporte.get("carpeta_origen")
     lineas = [
-        f"Proceso Trilay/Krikos - {fecha}",
+        f"{'Carga Krikos desde carpeta local' if carpeta_origen else 'Proceso Trilay/Krikos'} - {fecha}",
         f"Estado general: {'OK' if resultado_ok else 'CON ERRORES'}",
         "",
         "Resumen de esta ejecución:",
-        f"  PDF descargados desde Trilay: {len(reporte.get('descargadas', []))}",
+        (
+            f"  PDF encontrados en la carpeta: {len(reporte.get('archivos_entrada', []))}"
+            if carpeta_origen else
+            f"  PDF descargados desde Trilay: {len(reporte.get('descargadas', []))}"
+        ),
         f"  Facturas cargadas y enviadas: {len(exitosas)}",
+        f"  Facturas ya cargadas anteriormente en Krikos: {len(ya_cargadas)}",
         f"  Facturas con error: {len(errores)}",
         f"  Facturas pendientes o sin confirmación: {len(pendientes)}",
         f"  Facturas de cambio omitidas: {len(omitidas)}",
     ]
 
+    if carpeta_origen:
+        lineas += [f"Carpeta de entrada: {carpeta_origen}"]
+
     if reporte.get("observacion"):
         lineas += ["", f"Observación: {reporte['observacion']}"]
     if reporte.get("error_general"):
         lineas += ["", f"Error general: {reporte['error_general']}"]
+    for error in reporte.get("errores_generales", []):
+        lineas += ["", f"Error general: {error}"]
+
+    if reporte.get("provincias"):
+        lineas += ["", "RESULTADO POR PROVINCIA"]
+        for provincia in reporte["provincias"]:
+            lineas.append(
+                f"  {provincia['provincia']}: "
+                f"descarga={provincia['estado_descarga']}, "
+                f"PDF={len(provincia['descargadas'])}, "
+                f"Krikos={provincia['estado_krikos']}, "
+                f"ya cargadas={provincia.get('ya_cargadas', 0)}"
+            )
+
+    if reporte.get("descargadas"):
+        lineas += ["", "PDF DESCARGADOS DE TRILAY"]
+        for pdf in reporte["descargadas"]:
+            if isinstance(pdf, dict):
+                lineas.append(f"  - {pdf['provincia']} / {pdf['archivo']}")
+            else:
+                lineas.append(f"  - {pdf}")
 
     for titulo, facturas in (
         ("FACTURAS CARGADAS Y ENVIADAS", exitosas),
+        ("FACTURAS YA CARGADAS ANTERIORMENTE", ya_cargadas),
         ("FACTURAS CON ERROR", errores),
         ("FACTURAS PENDIENTES O SIN CONFIRMACIÓN", pendientes),
         ("FACTURAS DE CAMBIO OMITIDAS", omitidas),
@@ -48,6 +80,8 @@ def formatear_reporte_correo(fecha, resultado_ok, reporte, log_texto):
             lineas.append("  Ninguna.")
         for factura in facturas:
             identificacion = factura["archivo"]
+            if factura.get("provincia"):
+                identificacion = f"{factura['provincia']} / {identificacion}"
             if factura.get("numero"):
                 identificacion += f" (factura {factura['numero']})"
             lineas.append(f"  - {identificacion}")

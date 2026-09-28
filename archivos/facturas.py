@@ -34,6 +34,7 @@ def organizar_pdfs_generados(
     pdf_anteriores,
     cantidad_esperada,
     fecha_carpeta,
+    provincia,
 ):
 
     # ==========================================
@@ -42,6 +43,7 @@ def organizar_pdfs_generados(
 
     carpeta_destino = (
         CARPETA_FACTURAS
+        / provincia
         / fecha_carpeta
     )
 
@@ -136,6 +138,12 @@ def organizar_pdfs_generados(
             pdf_listos.append(
                 archivo
             )
+
+    if len(pdf_listos) != cantidad_esperada:
+        raise RuntimeError(
+            f"Se esperaban {cantidad_esperada} PDF nuevos y se encontraron "
+            f"{len(pdf_listos)}: {[archivo.name for archivo in pdf_listos]}"
+        )
 
 
     # ==========================================

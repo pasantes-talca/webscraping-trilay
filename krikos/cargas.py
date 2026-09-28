@@ -1,6 +1,7 @@
 import time
 
 from decimal import Decimal
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from config import (
     KRIKOS_URL,
@@ -48,6 +49,16 @@ def decimal_coma(
 # ==========================================
 # ENCABEZADO
 # ==========================================
+
+def detectar_factura_ya_cargada(page):
+    """Detecta el span de cierre del aviso de documento ya ingresado."""
+    aviso = page.locator("div.toaster-falso:has(span.close)").first
+    try:
+        aviso.wait_for(state="attached", timeout=3000)
+    except PlaywrightTimeoutError:
+        return None
+
+    return aviso.inner_text().strip() or "Krikos mostró un aviso de factura ya cargada."
 
 def completar_encabezado(
     page,
@@ -193,6 +204,8 @@ def completar_encabezado(
         ).fill(
             subtotal_redondo
         )
+
+    return detectar_factura_ya_cargada(page)
 
 
 # ==========================================
@@ -1355,10 +1368,15 @@ def procesar_factura_en_pagina(
     # ENCABEZADO
     # ======================================
 
-    completar_encabezado(
+    aviso_ya_cargada = completar_encabezado(
         page,
         datos,
     )
+
+    if aviso_ya_cargada:
+        datos["aviso_ya_cargada"] = aviso_ya_cargada
+        print(f"Factura ya cargada en Krikos: {aviso_ya_cargada}")
+        return "ya_cargada"
 
 
     # ======================================

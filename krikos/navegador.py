@@ -2,7 +2,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
-from config import EDGE_PATH
+from config import EDGE_PATH, KRIKOS_HEADLESS
 
 
 def crear_navegador():
@@ -20,7 +20,7 @@ def crear_navegador():
     try:
         browser = playwright.chromium.launch(
             executable_path=str(ejecutable_edge),
-            headless=False,
+            headless=KRIKOS_HEADLESS,
         )
     except Exception:
         playwright.stop()

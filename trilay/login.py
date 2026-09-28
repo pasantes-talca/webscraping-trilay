@@ -38,6 +38,16 @@ def iniciar_sesion(driver):
         30
     )
 
+    espera.until(
+        lambda navegador: (
+            "escritorio.asp" in navegador.current_url.lower()
+            or EC.presence_of_element_located((By.ID, "txtUsuario"))(navegador)
+        )
+    )
+
+    if "escritorio.asp" in driver.current_url.lower():
+        return
+
 
     campo_usuario = espera.until(
         EC.presence_of_element_located(

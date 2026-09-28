@@ -57,10 +57,12 @@ CLIENTE = "atomo"
 # SUCURSAL
 # ==========================================
 
-SUCURSAL = "MENDOZA"
+SUCURSALES_ORDEN = ("MENDOZA", "SAN JUAN", "SAN LUIS")
 
 SUCURSALES = {
     "MENDOZA": "7",
+    "SAN JUAN": "8",
+    "SAN LUIS": "9",
 }
 
 
@@ -106,6 +108,9 @@ IMPUESTO_SODA = 0.0
 
 ENVIAR_FACTURA_AUTOMATICAMENTE = True
 ESPERA_POST_ENVIO_MS = 1800
+KRIKOS_HEADLESS = os.getenv("KRIKOS_HEADLESS", "true").lower() in {
+    "1", "true", "si", "yes",
+}
 
 
 # ==========================================

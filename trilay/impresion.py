@@ -11,6 +11,7 @@ def imprimir_facturas_pdf(
     driver,
     facturas,
     sucursal,
+    codigo_sucursal=None,
 ):
 
     if not facturas:
@@ -19,9 +20,7 @@ def imprimir_facturas_pdf(
         )
 
 
-    codigo_sucursal = SUCURSALES.get(
-        sucursal
-    )
+    codigo_sucursal = codigo_sucursal or SUCURSALES.get(sucursal)
 
 
     if not codigo_sucursal:

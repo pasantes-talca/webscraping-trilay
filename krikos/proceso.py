@@ -3,6 +3,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+from config import SUCURSALES_ORDEN
+
 from krikos.servidor import (
     conectar_servidor,
     carpeta_del_dia,
@@ -317,15 +319,18 @@ def preparar_facturas(
 def cargar_facturas_krikos(
     facturas,
     carpetas,
+    sesion=None,
 ):
 
     if not facturas:
 
         return {
             "enviadas": 0,
+            "ya_cargadas": 0,
             "sin_enviar": 0,
             "errores": 0,
             "exitosas_detalle": [],
+            "ya_cargadas_detalle": [],
             "pendientes_detalle": [],
             "errores_detalle": [],
         }
@@ -338,9 +343,11 @@ def cargar_facturas_krikos(
 
 
     enviadas = 0
+    ya_cargadas = 0
     sin_enviar = 0
     errores = 0
     exitosas_detalle = []
+    ya_cargadas_detalle = []
     pendientes_detalle = []
     errores_detalle = []
     procesadas = set()
@@ -348,17 +355,16 @@ def cargar_facturas_krikos(
 
     try:
 
-        (
-            playwright,
-            browser,
-            context,
-            page,
-        ) = crear_navegador()
-
-
-        iniciar_sesion_krikos(
-            page
-        )
+        if sesion is not None and sesion.get("page") is not None:
+            page = sesion["page"]
+        else:
+            (playwright, browser, context, page) = crear_navegador()
+            if sesion is not None:
+                sesion.update({
+                    "playwright": playwright, "browser": browser,
+                    "context": context, "page": page,
+                })
+            iniciar_sesion_krikos(page)
 
 
         for indice, factura in enumerate(
@@ -415,6 +421,17 @@ def cargar_facturas_krikos(
 
                     enviadas += 1
                     exitosas_detalle.append(detalle_factura(ruta_pdf, datos))
+                    procesadas.add(ruta_pdf)
+
+                elif estado == "ya_cargada":
+                    mover_pdf(ruta_pdf, carpetas["procesadas"])
+                    ya_cargadas += 1
+                    ya_cargadas_detalle.append(detalle_factura(
+                        ruta_pdf,
+                        datos,
+                        datos.get("aviso_ya_cargada")
+                        or "Krikos indicó que esta factura ya había sido ingresada.",
+                    ))
                     procesadas.add(ruta_pdf)
 
 
@@ -502,7 +519,7 @@ def cargar_facturas_krikos(
 
     finally:
 
-        if (
+        if sesion is None and (
             playwright is not None
             and
             browser is not None
@@ -517,6 +534,7 @@ def cargar_facturas_krikos(
     return {
         "enviadas":
             enviadas,
+        "ya_cargadas": ya_cargadas,
 
         "sin_enviar":
             sin_enviar,
@@ -524,16 +542,59 @@ def cargar_facturas_krikos(
         "errores":
             errores,
         "exitosas_detalle": exitosas_detalle,
+        "ya_cargadas_detalle": ya_cargadas_detalle,
         "pendientes_detalle": pendientes_detalle,
         "errores_detalle": errores_detalle,
     }
+
+
+def cerrar_sesion_krikos(sesion):
+    if sesion.get("playwright") is not None:
+        cerrar_navegador(sesion["playwright"], sesion["browser"])
+        sesion.clear()
+
+
+def procesar_carpeta_local_krikos(carpeta_entrada):
+    """Carga únicamente los PDF ubicados directamente en la carpeta indicada."""
+    carpeta_entrada = Path(carpeta_entrada)
+    if not carpeta_entrada.is_dir():
+        raise FileNotFoundError(f"No existe la carpeta de facturas a cargar: {carpeta_entrada}")
+
+    carpetas = {
+        "pendientes": carpeta_entrada,
+        "procesadas": carpeta_entrada / "factura_procesada",
+        "errores": carpeta_entrada / "facturas_error",
+        "cambios": carpeta_entrada / "facturas_cambios",
+    }
+    for clave in ("procesadas", "errores", "cambios"):
+        carpetas[clave].mkdir(exist_ok=True)
+
+    detalle_preparacion = {"errores": [], "omitidas": []}
+    facturas = preparar_facturas(carpetas, detalle_preparacion)
+    resultado = cargar_facturas_krikos(facturas, carpetas)
+    resultado["errores_detalle"] = (
+        detalle_preparacion["errores"] + resultado["errores_detalle"]
+    )
+    resultado["omitidas_detalle"] = detalle_preparacion["omitidas"]
+    resultado["errores"] = len(resultado["errores_detalle"])
+    resultado["sin_enviar"] = len(resultado["pendientes_detalle"])
+
+    print("\nProceso Krikos finalizado.")
+    print(f"  Enviadas: {resultado['enviadas']}")
+    print(f"  Ya cargadas previamente: {resultado['ya_cargadas']}")
+    print(f"  Sin enviar: {resultado['sin_enviar']}")
+    print(f"  Errores: {resultado['errores']}")
+    return resultado
 
 
 # ==========================================
 # PROCESO COMPLETO KRIKOS
 # ==========================================
 
-def procesar_lote_krikos(fecha_carpeta=None):
+def procesar_lote_krikos(fecha_carpeta, provincia, sesion=None):
+
+    if provincia not in SUCURSALES_ORDEN:
+        raise ValueError(f"Provincia no configurada: {provincia}")
 
     fecha_proceso = (
         datetime.strptime(
@@ -564,7 +625,7 @@ def procesar_lote_krikos(fecha_carpeta=None):
 
     carpeta_dia = (
         carpeta_del_dia(
-            raiz_servidor,
+            raiz_servidor / provincia,
             fecha_proceso,
         )
     )
@@ -640,7 +701,7 @@ def procesar_lote_krikos(fecha_carpeta=None):
     detalle_preparacion = {"errores": [], "omitidas": []}
     facturas = preparar_facturas(carpetas, detalle_preparacion)
 
-    resultado = cargar_facturas_krikos(facturas, carpetas)
+    resultado = cargar_facturas_krikos(facturas, carpetas, sesion=sesion)
     resultado["errores_detalle"] = (
         resultado_importacion.get("errores_detalle", [])
         + detalle_preparacion["errores"]
@@ -674,6 +735,8 @@ def procesar_lote_krikos(fecha_carpeta=None):
         f"  Enviadas: "
         f"{resultado['enviadas']}"
     )
+
+    print(f"  Ya cargadas previamente: {resultado['ya_cargadas']}")
 
     print(
         f"  Sin enviar: "

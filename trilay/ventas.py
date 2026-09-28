@@ -45,11 +45,8 @@ def seleccionar_sucursal(driver, sucursal):
             return 'NO_ENCONTRADO';
         }
 
-        selector.value =
-            arguments[0];
-
+        selector.value = arguments[0];
         cargarDivs();
-
         return selector.value;
         """,
         codigo_sucursal
@@ -59,11 +56,12 @@ def seleccionar_sucursal(driver, sucursal):
     if resultado != codigo_sucursal:
 
         raise Exception(
-            f"No se pudo seleccionar {sucursal}."
+            f"No se pudo seleccionar {sucursal} en Trilay: {resultado}."
         )
 
 
     time.sleep(5)
+    return codigo_sucursal
 
 
 def abrir_ventas(driver):
