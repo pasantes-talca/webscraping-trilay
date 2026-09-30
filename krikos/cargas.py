@@ -46,6 +46,39 @@ def decimal_coma(
     )
 
 
+def seleccionar_unidad_pack(page, campo_unidad):
+    """Selecciona Pack en el autocompletado, incluso si tarda en abrirse."""
+    opcion = page.locator(
+        'mat-option:has-text("Pack - Bultos"):visible, '
+        'mat-option:has-text("Pack"):visible'
+    ).first
+
+    for intento in range(3):
+        campo_unidad.click()
+        campo_unidad.fill("")
+        # El autocompletado de Krikos puede depender de eventos de teclado.
+        campo_unidad.press_sequentially("Pack", delay=80)
+
+        try:
+            opcion.wait_for(state="visible", timeout=6000)
+            opcion.click()
+            if "pack" in campo_unidad.input_value().strip().lower():
+                return
+        except PlaywrightTimeoutError:
+            pass
+
+        if intento < 2:
+            page.wait_for_timeout(500)
+
+    valor = campo_unidad.input_value()
+    opciones = page.locator("mat-option:visible").all_inner_texts()
+    raise RuntimeError(
+        "No se pudo seleccionar la unidad Pack en Krikos "
+        f"tras 3 intentos. Valor del campo: {valor!r}; "
+        f"opciones visibles: {opciones!r}"
+    )
+
+
 # ==========================================
 # ENCABEZADO
 # ==========================================
@@ -355,35 +388,7 @@ def completar_items(
         )
 
 
-        campo_unidad.fill(
-            "Pack"
-        )
-
-
-        time.sleep(
-            0.4
-        )
-
-
-        opcion_unidad = page.locator(
-            (
-                'mat-option:has-text('
-                '"Pack - Bultos"'
-                '):visible, '
-                'mat-option:has-text('
-                '"Pack"'
-                '):visible'
-            )
-        ).first
-
-
-        opcion_unidad.wait_for(
-            state="visible",
-            timeout=4000,
-        )
-
-
-        opcion_unidad.click()
+        seleccionar_unidad_pack(page, campo_unidad)
 
 
         # ==================================
