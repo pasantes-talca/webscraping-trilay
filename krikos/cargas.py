@@ -1067,6 +1067,39 @@ def completar_pie(
 # GLN + ENVÍO
 # ==========================================
 
+def escribir_gln_estable(page, campo_numero, valor_gln):
+    """Escribe el GLN y espera a que Krikos conserve el valor."""
+    actual = ""
+
+    for intento in range(3):
+        campo_numero.click()
+        campo_numero.fill("")
+
+        if intento == 0:
+            campo_numero.fill(valor_gln)
+        else:
+            # Los eventos de teclado ayudan si Krikos ignora o revierte fill().
+            campo_numero.press_sequentially(valor_gln, delay=50)
+
+        page.wait_for_timeout(500)
+        actual = (campo_numero.input_value() or "").strip()
+
+        if actual == valor_gln:
+            page.wait_for_timeout(350)
+            actual = (campo_numero.input_value() or "").strip()
+            if actual == valor_gln:
+                return
+
+        if intento < 2:
+            print("Krikos limpió el GLN. Reintentando...")
+            page.wait_for_timeout(500)
+
+    raise RuntimeError(
+        "El GLN no quedó escrito. "
+        f"Esperado={valor_gln!r}, actual={actual!r}"
+    )
+
+
 def cargar_gln_y_enviar(
     page,
     ruta_pdf,
@@ -1207,65 +1240,7 @@ def cargar_gln_y_enviar(
     campo_numero.scroll_into_view_if_needed()
 
 
-    # Primer intento.
-
-    campo_numero.click()
-
-
-    campo_numero.fill(
-        valor_gln
-    )
-
-
-    page.wait_for_timeout(
-        450
-    )
-
-
-    actual = (
-        campo_numero
-        .input_value()
-        or ""
-    ).strip()
-
-
-    # Krikos a veces limpia el campo.
-
-    if actual != valor_gln:
-
-        print(
-            "Krikos limpió el GLN. "
-            "Reintentando..."
-        )
-
-
-        campo_numero.click()
-
-
-        campo_numero.fill(
-            ""
-        )
-
-
-        campo_numero.fill(
-            valor_gln
-        )
-
-
-    actual = (
-        campo_numero
-        .input_value()
-        or ""
-    ).strip()
-
-
-    if actual != valor_gln:
-
-        raise RuntimeError(
-            "El GLN no quedó escrito. "
-            f"Esperado={valor_gln!r}, "
-            f"actual={actual!r}"
-        )
+    escribir_gln_estable(page, campo_numero, valor_gln)
 
 
     # ======================================
@@ -1292,6 +1267,10 @@ def cargar_gln_y_enviar(
         state="visible",
         timeout=7000,
     )
+
+    # Krikos puede reconstruir el formulario mientras aparece el botón.
+    if (campo_numero.input_value() or "").strip() != valor_gln:
+        escribir_gln_estable(page, campo_numero, valor_gln)
 
 
     # Es intencional que no hagamos Tab
