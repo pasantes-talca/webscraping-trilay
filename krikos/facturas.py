@@ -1,7 +1,9 @@
 import time
+from pathlib import Path
+
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from krikos.login import bloquear_chat
-from krikos.validaciones import cerrar_dialogo_archivo_so
 
 
 def abrir_nueva_factura(
@@ -64,76 +66,31 @@ def subir_pdf(
     ruta_pdf,
 ):
 
-    subido = False
-
-
-    try:
-
-        with page.expect_file_chooser(
-            timeout=3000
-        ) as selector_archivo:
-
-            page.click(
-                (
-                    'button:has-text('
-                    '"SUBA EL PDF DE SU FACTURA"'
-                    ')'
-                ),
-                timeout=3000,
-            )
-
-
-        selector_archivo.value.set_files(
-            ruta_pdf
-        )
-
-
-        subido = True
-
-
-    except Exception:
-        pass
-
-
-    if not subido:
-
-        page.locator(
-            "input#fileOriginal"
-        ).set_input_files(
-            ruta_pdf
-        )
-
-
-    time.sleep(
-        0.5
-    )
-
-
-    cerrar_dialogo_archivo_so()
-
+    # Enviar bytes evita que Edge mantenga abierto el PDF original en Windows/SMB.
+    ruta = Path(ruta_pdf)
+    for intento in range(5):
+        try:
+            contenido = ruta.read_bytes()
+            break
+        except PermissionError:
+            if intento == 4:
+                raise
+            time.sleep(1)
+    archivo = {"name": ruta.name, "mimeType": "application/pdf", "buffer": contenido}
+    campo = page.locator("input#fileOriginal")
+    if campo.count():
+        campo.set_input_files(archivo)
+    else:
+        with page.expect_file_chooser(timeout=5000) as selector:
+            page.get_by_role("button", name="SUBA EL PDF DE SU FACTURA").click()
+        selector.value.set_files(archivo)
 
     try:
-
-        page.keyboard.press(
-            "Escape"
+        page.locator('input[formcontrolname="ptoVta"]').wait_for(
+            state="visible", timeout=45000,
         )
-
-    except Exception:
-        pass
-
-
-    try:
-
-        page.wait_for_selector(
-            (
-                'text="Se identificó correctamente '
-                'el emisor y receptor del documento"'
-            ),
-            timeout=15000,
-        )
-
-    except Exception:
-
-        # A veces el formulario ya está listo
-        # aunque el mensaje no aparezca.
-        pass
+    except PlaywrightTimeoutError as error:
+        raise PlaywrightTimeoutError(
+            "Krikos no habilitó el encabezado después de adjuntar el PDF "
+            f"{ruta.name}. URL: {page.url}"
+        ) from error

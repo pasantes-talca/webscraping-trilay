@@ -487,32 +487,45 @@ def extraer_datos_pdf(
             ]
 
 
-            for indice in range(
-                0,
-                len(bloque) - 6,
-                7,
-            ):
+            indice = 0
+            patron_numero = re.compile(r"^-?\d+(?:\.\d+)?$")
+            while indice < len(bloque):
+                if not bloque[indice]:
+                    indice += 1
+                    continue
 
+                codigo = bloque[indice]
+                if not re.fullmatch(r"\d+", codigo):
+                    raise ValueError(
+                        f"Renglón de producto inesperado: {codigo!r}"
+                    )
+
+                # La descripción puede ocupar más de una línea en el PDF.
+                inicio_numeros = next(
+                    (
+                        posicion
+                        for posicion in range(indice + 2, len(bloque) - 4)
+                        if all(
+                            patron_numero.fullmatch(valor)
+                            for valor in bloque[posicion:posicion + 5]
+                        )
+                    ),
+                    None,
+                )
+                if inicio_numeros is None:
+                    raise ValueError(
+                        f"No se pudieron leer cantidad e importes del producto {codigo}."
+                    )
+
+                descripcion = " ".join(bloque[indice + 1:inicio_numeros])
                 (
-                    codigo,
-                    descripcion,
                     cantidad,
                     precio_unitario,
                     descuento,
                     impuesto_pdf,
                     importe,
-                ) = bloque[
-                    indice:
-                    indice + 7
-                ]
-
-
-                if not re.match(
-                    r"^\d+$",
-                    codigo
-                ):
-
-                    continue
+                ) = bloque[inicio_numeros:inicio_numeros + 5]
+                indice = inicio_numeros + 5
 
 
                 cantidad = a_float(

@@ -14,7 +14,9 @@ from archivos.facturas import registrar_pdfs_existentes, organizar_pdfs_generado
 from integraciones.krikos import cargar_facturas_en_krikos
 from krikos.servidor import conectar_servidor
 from krikos.proceso import cerrar_sesion_krikos, procesar_carpeta_local_krikos
-from integraciones.correo import enviar_log_por_correo, formatear_reporte_correo
+from integraciones.correo import (
+    enviar_log_por_correo, formatear_reporte_correo, formatear_reporte_correo_html,
+)
 from utils.registro import registrar_ejecucion
 from utils.fechas import formatos_fecha_facturacion
 
@@ -205,13 +207,11 @@ def main_trilay(fecha_facturacion=None):
     asunto = f"Proceso Trilay/Krikos {fecha_carpeta}: {estado}"
 
     try:
-        if ruta_log is None:
-            raise RuntimeError("No se pudo crear el archivo de log")
-        log_texto = ruta_log.read_text(encoding="utf-8")
         cuerpo = formatear_reporte_correo(
-            fecha_carpeta, resultado_ok, reporte, log_texto
+            fecha_carpeta, resultado_ok, reporte
         )
-        enviar_log_por_correo(asunto, cuerpo)
+        cuerpo_html = formatear_reporte_correo_html(fecha_carpeta, resultado_ok, reporte)
+        enviar_log_por_correo(asunto, cuerpo, cuerpo_html=cuerpo_html)
         print(f"Correo de resultado enviado: {asunto}")
     except Exception as error:
         print(
@@ -253,13 +253,11 @@ def main():
     estado = "OK" if resultado_ok else "CON ERRORES"
     asunto = f"Carga Krikos desde carpeta local {fecha_carpeta}: {estado}"
     try:
-        if ruta_log is None:
-            raise RuntimeError("No se pudo crear el archivo de log")
-        log_texto = ruta_log.read_text(encoding="utf-8")
         cuerpo = formatear_reporte_correo(
-            fecha_carpeta, resultado_ok, reporte, log_texto
+            fecha_carpeta, resultado_ok, reporte
         )
-        enviar_log_por_correo(asunto, cuerpo)
+        cuerpo_html = formatear_reporte_correo_html(fecha_carpeta, resultado_ok, reporte)
+        enviar_log_por_correo(asunto, cuerpo, cuerpo_html=cuerpo_html)
         print(f"Correo de resultado enviado: {asunto}")
     except Exception as error:
         print(

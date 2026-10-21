@@ -1284,20 +1284,37 @@ def cargar_gln_y_enviar(
     )
 
 
-    try:
-
-        page.locator(
-            "#boton-nuevo-documento"
-        ).wait_for(
-            state="visible",
-            timeout=7000,
+    # «Nuevo documento» está visible incluso con el formulario sin enviar.
+    # Una ventana de diferencias requiere intervención y no prueba un envío.
+    confirmacion = page.get_by_role("button", name="CONFIRMAR", exact=True)
+    if confirmacion.count() and confirmacion.is_visible():
+        datos["motivo_sin_confirmar"] = (
+            "Krikos pidió confirmar diferencias en los importes. "
+            "La factura quedó sin enviar y requiere revisión."
         )
-
-    except Exception:
         return "envio_sin_confirmar"
 
-
     return "enviada"
+
+
+def verificar_factura_ingresada(page, ruta_pdf, datos):
+    """Comprueba el ingreso volviendo a consultar el encabezado en Krikos."""
+    for intento in range(1, 4):
+        try:
+            page.wait_for_timeout(3000)
+            abrir_nueva_factura(page, KRIKOS_URL)
+            subir_pdf(page, ruta_pdf)
+            aviso = completar_encabezado(page, datos)
+            if not aviso:
+                page.wait_for_timeout(3000)
+                aviso = detectar_factura_ya_cargada(page)
+            if aviso:
+                print(f"Envío confirmado en Krikos: {aviso}")
+                return True
+            print(f"Krikos aún no confirma el ingreso (intento {intento}/3).")
+        except Exception as error:
+            print(f"No se pudo verificar el ingreso (intento {intento}/3): {error}")
+    return False
 
 
 # ==========================================
@@ -1332,30 +1349,17 @@ def procesar_factura_en_pagina(
     # ABRIR FACTURA
     # ======================================
 
-    abrir_nueva_factura(
-        page,
-        KRIKOS_URL,
-    )
-
-
-    # ======================================
-    # SUBIR PDF
-    # ======================================
-
-    subir_pdf(
-        page,
-        ruta_pdf,
-    )
-
-
-    # ======================================
-    # ENCABEZADO
-    # ======================================
-
-    aviso_ya_cargada = completar_encabezado(
-        page,
-        datos,
-    )
+    # Solo reintentar antes del envío: volver a abrir aquí no duplica documentos.
+    for intento in range(3):
+        try:
+            abrir_nueva_factura(page, KRIKOS_URL)
+            subir_pdf(page, ruta_pdf)
+            aviso_ya_cargada = completar_encabezado(page, datos)
+            break
+        except PlaywrightTimeoutError:
+            if intento == 2:
+                raise
+            print(f"Krikos no habilitó el formulario. Reintentando ({intento + 2}/3)...")
 
     if aviso_ya_cargada:
         datos["aviso_ya_cargada"] = aviso_ya_cargada
@@ -1407,6 +1411,15 @@ def procesar_factura_en_pagina(
         ruta_pdf,
         datos,
     )
+
+    if estado == "enviada" and not verificar_factura_ingresada(
+        page, ruta_pdf, datos
+    ):
+        datos["motivo_sin_confirmar"] = (
+            "Se pulsó Enviar factura, pero una nueva consulta del encabezado "
+            "no mostró el aviso de documento ingresado. Revisar antes de reintentar."
+        )
+        return "envio_sin_confirmar"
 
 
     return estado

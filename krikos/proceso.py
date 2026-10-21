@@ -1,4 +1,5 @@
 import shutil
+import time
 
 from datetime import datetime
 from pathlib import Path
@@ -155,10 +156,16 @@ def mover_pdf(
     )
 
 
-    shutil.move(
-        str(origen),
-        str(destino),
-    )
+    # El navegador puede retener el PDF unos instantes en Windows. El
+    # movimiento atómico evita dejar una copia en destino si falla el origen.
+    for intento in range(5):
+        try:
+            origen.replace(destino)
+            break
+        except PermissionError:
+            if intento == 4:
+                raise
+            time.sleep(1)
 
 
     return destino
@@ -394,6 +401,7 @@ def cargar_facturas_krikos(
             )
 
 
+            estado = None
             try:
 
                 estado = (
@@ -403,6 +411,12 @@ def cargar_facturas_krikos(
                         datos,
                     )
                 )
+
+                if estado in ("enviada", "ya_cargada"):
+                    try:
+                        page.goto("about:blank", wait_until="domcontentloaded")
+                    except Exception as error_navegacion:
+                        print(f"No se pudo liberar el PDF adjunto: {error_navegacion}")
 
 
                 # ==========================
@@ -456,7 +470,8 @@ def cargar_facturas_krikos(
                     sin_enviar += 1
                     pendientes_detalle.append(detalle_factura(
                         ruta_pdf, datos,
-                        "Se pulsó Enviar factura, pero Krikos no mostró la pantalla de confirmación. Verificar en Krikos antes de reintentar para evitar duplicados.",
+                        datos.get("motivo_sin_confirmar")
+                        or "Krikos no confirmó el ingreso de la factura. Revisar antes de reintentar.",
                     ))
                     procesadas.add(ruta_pdf)
 
@@ -481,6 +496,28 @@ def cargar_facturas_krikos(
 
 
             except Exception as error:
+
+                # Un fallo de archivo no revierte un ingreso confirmado en Krikos.
+                if estado in ("enviada", "ya_cargada"):
+                    motivo = (
+                        "Ingreso confirmado en Krikos, pero no se pudo archivar el PDF: "
+                        f"{error}. No reenviar; queda en su carpeta de origen."
+                    )
+                    print(motivo)
+                    detalle = detalle_factura(ruta_pdf, datos, motivo)
+                    if estado == "enviada":
+                        enviadas += 1
+                        exitosas_detalle.append(detalle)
+                    else:
+                        ya_cargadas += 1
+                        ya_cargadas_detalle.append(detalle)
+                    procesadas.add(ruta_pdf)
+                    continue
+
+                try:
+                    page.goto("about:blank", wait_until="domcontentloaded")
+                except Exception:
+                    pass
 
                 print(
                     f"Error cargando "
