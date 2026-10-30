@@ -9,7 +9,9 @@ from trilay.login import PASSWORD, USUARIO
 
 
 class SesionTrilay:
-    def __init__(self):
+    def __init__(self, headless=True, slow_mo=0):
+        self.headless = headless
+        self.slow_mo = slow_mo
         self.playwright = None
         self.browser = None
         self.page = None
@@ -19,7 +21,7 @@ class SesionTrilay:
         self.playwright = sync_playwright().start()
         try:
             self.browser = self.playwright.chromium.launch(
-                executable_path=EDGE_PATH, headless=True
+                executable_path=EDGE_PATH, headless=self.headless, slow_mo=self.slow_mo
             )
             self.page = self.browser.new_page()
             self.page.goto(TRILAY_URL, wait_until="domcontentloaded", timeout=30000)
@@ -42,7 +44,12 @@ class SesionTrilay:
             self.playwright.stop()
             self.playwright = None
 
-    def buscar_facturas(self, provincia, fecha, cliente):
+    def buscar_facturas(self, provincia, fecha, cliente, fecha_hasta=None):
+        fecha_hasta = fecha_hasta or fecha
+        fecha_inicio = datetime.strptime(fecha, "%d/%m/%Y").date()
+        fecha_fin = datetime.strptime(fecha_hasta, "%d/%m/%Y").date()
+        if fecha_fin < fecha_inicio:
+            raise ValueError("La fecha final no puede ser anterior a la inicial")
         codigo = SUCURSALES[provincia]
         self.page.goto(
             TRILAY_URL.rstrip("/") + "/escritorio.asp",
@@ -69,10 +76,10 @@ class SesionTrilay:
             frame for frame in self.page.frames
             if "ventas/ventas.asp" in frame.url.lower()
         )
-        valores = frame_ventas.evaluate("""({fecha, cliente}) => {
-            for (const id of ['txtFechaIni', 'txtFechaFin']) {
+        valores = frame_ventas.evaluate("""({fecha, fecha_hasta, cliente}) => {
+            for (const [id, valor] of [['txtFechaIni', fecha], ['txtFechaFin', fecha_hasta]]) {
                 const campo = document.getElementById(id);
-                campo.value = fecha;
+                campo.value = valor;
                 campo.dispatchEvent(new Event('change', {bubbles: true}));
             }
             const buscador = document.getElementById('txtBusqueda');
@@ -83,8 +90,8 @@ class SesionTrilay:
             return [document.getElementById('txtFechaIni').value,
                     document.getElementById('txtFechaFin').value,
                     buscador.value];
-        }""", {"fecha": fecha, "cliente": cliente})
-        if valores != [fecha, fecha, cliente]:
+        }""", {"fecha": fecha, "fecha_hasta": fecha_hasta, "cliente": cliente})
+        if valores != [fecha, fecha_hasta, cliente]:
             raise RuntimeError(f"Los filtros de Trilay no quedaron correctos: {valores}")
 
         # Trilay actualiza el listado en un iframe con código heredado.
@@ -104,7 +111,6 @@ class SesionTrilay:
             }
         )""")
 
-        fecha_esperada = datetime.strptime(fecha, "%d/%m/%Y").date()
         for factura in facturas:
             try:
                 fecha_factura = datetime.strptime(
@@ -114,7 +120,7 @@ class SesionTrilay:
                 raise RuntimeError(
                     f"Trilay devolvió una factura sin fecha válida: {factura['codigo']}"
                 ) from error
-            if fecha_factura != fecha_esperada or cliente.upper() not in factura["texto"].upper():
+            if not fecha_inicio <= fecha_factura <= fecha_fin or cliente.upper() not in factura["texto"].upper():
                 raise RuntimeError(
                     f"El filtro de Trilay devolvió otra fecha o cliente: {factura['codigo']}"
                 )

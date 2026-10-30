@@ -184,6 +184,12 @@ def completar_encabezado(
             ),
         )
 
+        # El aviso puede aparecer al completar el número y desaparecer
+        # mientras se llenan los campos restantes del encabezado.
+        aviso = detectar_factura_ya_cargada(page)
+        if aviso:
+            return aviso
+
 
     # ======================================
     # FECHA DE INICIO DE ACTIVIDAD

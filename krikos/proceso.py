@@ -32,6 +32,7 @@ from krikos.login import (
 
 from krikos.cargas import (
     procesar_factura_en_pagina,
+    verificar_factura_ingresada,
 )
 
 
@@ -358,6 +359,7 @@ def cargar_facturas_krikos(
     pendientes_detalle = []
     errores_detalle = []
     procesadas = set()
+    candidatos_revisar = []
 
 
     try:
@@ -474,6 +476,9 @@ def cargar_facturas_krikos(
                         or "Krikos no confirmó el ingreso de la factura. Revisar antes de reintentar.",
                     ))
                     procesadas.add(ruta_pdf)
+                    candidatos_revisar.append(
+                        (ruta_pdf, datos, "pendiente", pendientes_detalle[-1])
+                    )
 
 
                 # ==========================
@@ -526,9 +531,10 @@ def cargar_facturas_krikos(
                 )
 
                 motivo = f"No se pudo cargar o enviar en Krikos: {error}"
+                ruta_revision = ruta_pdf
                 try:
 
-                    mover_pdf(
+                    ruta_revision = mover_pdf(
                         ruta_pdf,
                         carpetas[
                             "errores"
@@ -542,6 +548,48 @@ def cargar_facturas_krikos(
                 errores += 1
                 errores_detalle.append(detalle_factura(ruta_pdf, datos, motivo))
                 procesadas.add(ruta_pdf)
+                candidatos_revisar.append(
+                    (ruta_revision, datos, "error", errores_detalle[-1])
+                )
+
+
+        # Una confirmación puede llegar después de los intentos inmediatos.
+        # Volver a consultar al cerrar el lote evita informar falsos errores.
+        for ruta_revision, datos_revision, categoria, detalle_revision in candidatos_revisar:
+            if not ruta_revision.exists():
+                continue
+            try:
+                confirmado = verificar_factura_ingresada(
+                    page, ruta_revision, datos_revision
+                )
+            except Exception as error_revision:
+                print(f"No se pudo revisar {ruta_revision.name}: {error_revision}")
+                continue
+            if not confirmado:
+                continue
+            try:
+                page.goto("about:blank", wait_until="domcontentloaded")
+                mover_pdf(ruta_revision, carpetas["procesadas"])
+            except Exception as error_archivo:
+                print(
+                    f"Ingreso confirmado, pero no se pudo archivar "
+                    f"{ruta_revision.name}: {error_archivo}"
+                )
+            if categoria == "pendiente":
+                pendientes_detalle.remove(detalle_revision)
+                sin_enviar -= 1
+                enviadas += 1
+                exitosas_detalle.append(
+                    detalle_factura(ruta_revision, datos_revision)
+                )
+            else:
+                errores_detalle.remove(detalle_revision)
+                errores -= 1
+                ya_cargadas += 1
+                ya_cargadas_detalle.append(detalle_factura(
+                    ruta_revision, datos_revision,
+                    "Ingreso confirmado en la revisión final tras un error de carga.",
+                ))
 
 
     except Exception as error:

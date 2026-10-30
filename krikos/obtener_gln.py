@@ -126,7 +126,7 @@ def _extraer_datos_cliente(
 
     coincidencia = re.search(
         (
-            r"Sr\.?(?:\(s\))?\s*[:.]?\s*"
+            r"\bSr\.?(?:\(s\))?\s*[:.]?\s*"
             r"(.+?)"
             r"(?=\s+Domicilio\b"
             r"|\s+IVA\s*:"
