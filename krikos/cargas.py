@@ -1374,13 +1374,10 @@ def procesar_factura_en_pagina(
 
 
     # ======================================
-    # PRODUCTOS
+    # PRODUCTOS: Krikos los carga automáticamente al adjuntar el PDF.
     # ======================================
 
-    completar_items(
-        page,
-        datos,
-    )
+    # completar_items(page, datos)
 
 
     # ======================================

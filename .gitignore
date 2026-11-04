@@ -40,3 +40,5 @@ tests/
 data/
 *.md
 ejecutar.bat
+/diagnosticos
+/recuperacion
