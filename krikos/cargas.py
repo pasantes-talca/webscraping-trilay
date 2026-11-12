@@ -1361,6 +1361,13 @@ def procesar_factura_en_pagina(
             abrir_nueva_factura(page, KRIKOS_URL)
             subir_pdf(page, ruta_pdf)
             aviso_ya_cargada = completar_encabezado(page, datos)
+            if aviso_ya_cargada:
+                break
+            # Products are loaded by Krikos from the attached PDF.
+            # Taxes and footer stay inside the retry: nothing has been sent yet,
+            # and the tax section sometimes renders late (porcentaje select timeout).
+            completar_impuestos(page, datos)
+            completar_pie(page, datos)
             break
         except PlaywrightTimeoutError:
             if intento == 2:
@@ -1371,33 +1378,6 @@ def procesar_factura_en_pagina(
         datos["aviso_ya_cargada"] = aviso_ya_cargada
         print(f"Factura ya cargada en Krikos: {aviso_ya_cargada}")
         return "ya_cargada"
-
-
-    # ======================================
-    # PRODUCTOS: Krikos los carga automáticamente al adjuntar el PDF.
-    # ======================================
-
-    # completar_items(page, datos)
-
-
-    # ======================================
-    # IMPUESTOS
-    # ======================================
-
-    completar_impuestos(
-        page,
-        datos,
-    )
-
-
-    # ======================================
-    # PIE
-    # ======================================
-
-    completar_pie(
-        page,
-        datos,
-    )
 
 
     # ======================================

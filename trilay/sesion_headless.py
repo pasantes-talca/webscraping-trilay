@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Error as PlaywrightError, sync_playwright
 
 from config import EDGE_PATH, SUCURSALES, TRILAY_URL
 from trilay.login import PASSWORD, USUARIO
@@ -20,11 +20,7 @@ class SesionTrilay:
     def __enter__(self):
         self.playwright = sync_playwright().start()
         try:
-            self.browser = self.playwright.chromium.launch(
-                executable_path=EDGE_PATH, headless=self.headless, slow_mo=self.slow_mo
-            )
-            self.page = self.browser.new_page()
-            self.page.goto(TRILAY_URL, wait_until="domcontentloaded", timeout=30000)
+            self._abrir_trilay()
             if "escritorio.asp" not in self.page.url.lower():
                 self.page.locator("#txtUsuario").fill(USUARIO)
                 self.page.locator("#txtPass").fill(PASSWORD)
@@ -35,6 +31,36 @@ class SesionTrilay:
         except Exception:
             self.__exit__(None, None, None)
             raise
+
+    def _abrir_trilay(self):
+        """Open Trilay, falling back from Edge to bundled Chromium and retrying.
+
+        Edge may block the site (ERR_BLOCKED_BY_CLIENT) or the server may be
+        slow to answer (timeout); both used to abort the whole run.
+        """
+        intentos = [("Edge", EDGE_PATH), ("Chromium", None), ("Chromium", None)]
+        ultimo_error = None
+        for numero, (nombre, ejecutable) in enumerate(intentos, start=1):
+            if self.browser is not None:
+                self.browser.close()
+                self.browser = None
+            opciones = {"headless": self.headless, "slow_mo": self.slow_mo}
+            if ejecutable:
+                opciones["executable_path"] = ejecutable
+            try:
+                self.browser = self.playwright.chromium.launch(**opciones)
+                self.page = self.browser.new_page()
+                self.page.goto(TRILAY_URL, wait_until="domcontentloaded", timeout=60000)
+                if numero > 1:
+                    print(f"Trilay abierto con {nombre} (intento {numero}).")
+                return
+            except PlaywrightError as error:
+                ultimo_error = error
+                print(
+                    f"No se pudo abrir Trilay con {nombre} (intento {numero}/{len(intentos)}): "
+                    f"{str(error).splitlines()[0]}"
+                )
+        raise ultimo_error
 
     def __exit__(self, *_):
         if self.browser is not None:
